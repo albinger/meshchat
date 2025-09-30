@@ -1,6 +1,8 @@
-use crate::device_view::DeviceEvent::{ConnectedEvent, DeviceConnect, DeviceDisconnect};
-use crate::device_view::State::{Connected, Connecting, Disconnected};
-use crate::Message;
+use crate::device_view::DeviceEvent::{
+    ConnectedEvent, DeviceConnect, DeviceDisconnect, DisconnectedEvent,
+};
+use crate::device_view::State::{Connected, Connecting, Disconnected, Disconnecting};
+use crate::{comms, Message};
 use btleplug::platform::PeripheralId;
 use iced::widget::{button, container, text, Column};
 use iced::{Element, Length, Task};
@@ -9,6 +11,7 @@ enum State {
     Disconnected,
     Connecting(PeripheralId),
     Connected(PeripheralId),
+    Disconnecting(PeripheralId),
 }
 
 #[derive(Debug, Clone)]
@@ -16,6 +19,7 @@ pub enum DeviceEvent {
     DeviceConnect(PeripheralId),
     DeviceDisconnect(PeripheralId),
     ConnectedEvent(PeripheralId),
+    DisconnectedEvent(PeripheralId),
 }
 
 pub struct DeviceView {
@@ -43,25 +47,29 @@ impl DeviceView {
                 self.state = Connecting(id.clone());
                 (
                     true,
-                    Task::perform(Self::do_connect(id.clone()), |result| {
+                    Task::perform(comms::do_connect(id.clone()), |result| {
                         Message::Device(ConnectedEvent(result.unwrap()))
                     }),
                 )
             }
-            DeviceDisconnect(_id) => {
-                self.state = Disconnected;
-                (false, Task::none())
+            DeviceDisconnect(id) => {
+                self.state = Disconnecting(id.clone());
+                (
+                    true,
+                    Task::perform(comms::do_disconnect(id.clone()), |result| {
+                        Message::Device(DisconnectedEvent(result.unwrap()))
+                    }),
+                )
             }
             ConnectedEvent(id) => {
                 self.state = Connected(id);
                 (true, Task::none())
             }
+            DisconnectedEvent(_) => {
+                self.state = Disconnected;
+                (false, Task::none())
+            }
         }
-    }
-
-    async fn do_connect(id: PeripheralId) -> Result<PeripheralId, btleplug::Error> {
-        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-        Ok(id)
     }
 
     pub fn view(&self) -> Element<'static, Message> {
@@ -83,6 +91,9 @@ impl DeviceView {
                 main_col = main_col.push(
                     button("Disconnect").on_press(Message::Device(DeviceDisconnect(id.clone()))),
                 );
+            }
+            State::Disconnecting(id) => {
+                main_col = main_col.push(text(format!("disconnecting from : {id}")));
             }
         }
 

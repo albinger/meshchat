@@ -1,6 +1,7 @@
 //! MeshChat is an iced GUI app that uses the meshtastic "rust" crate to discover and control
 //! meshtastic compatible radios connected to the host running it
 
+mod comms;
 mod device_list_view;
 mod device_view;
 mod discovery;
@@ -8,8 +9,8 @@ mod discovery;
 use crate::device_list_view::DeviceListView;
 use crate::device_view::{DeviceEvent, DeviceView};
 use crate::discovery::{ble_discovery, DiscoveryEvent};
-use crate::Message::{Device, Discovery, NavigationBack, WindowEvent};
-use iced::{Element, Pixels, Settings, Size, Subscription, Task, Theme};
+use crate::Message::{Device, Discovery, Exit, NavigationBack, WindowEvent};
+use iced::{window, Element, Pixels, Settings, Size, Subscription, Task, Theme};
 use std::cmp::PartialEq;
 
 const MESHCHAT_ID: &str = "meshchat";
@@ -33,6 +34,7 @@ pub enum Message {
     WindowEvent(iced::Event),
     Discovery(DiscoveryEvent),
     Device(DeviceEvent),
+    Exit,
 }
 
 fn main() -> iced::Result {
@@ -44,7 +46,6 @@ fn main() -> iced::Result {
 
     iced::application(MeshChat::title, MeshChat::update, MeshChat::view)
         .subscription(MeshChat::subscription)
-        .window_size((500.0, 800.0))
         .exit_on_close_request(false)
         .resizable(true)
         .settings(settings)
@@ -77,7 +78,17 @@ impl MeshChat {
                 }
                 Task::none()
             }
-            WindowEvent(_) => Task::none(),
+            WindowEvent(event) => {
+                if let iced::Event::Window(window::Event::CloseRequested) = event {
+                    if let Some(id) = self.device_view.connected_device() {
+                        Task::perform(comms::do_disconnect(id.clone()), |_result| Exit)
+                    } else {
+                        window::get_latest().and_then(window::close)
+                    }
+                } else {
+                    Task::none()
+                }
+            }
             Discovery(discovery_event) => self.device_list_view.update(discovery_event),
             Device(device_event) => {
                 let (show_device_view, task) = self.device_view.update(device_event);
@@ -88,6 +99,7 @@ impl MeshChat {
                 };
                 task
             }
+            Exit => window::get_latest().and_then(window::close),
         }
     }
 
