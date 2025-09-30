@@ -1,8 +1,8 @@
-use crate::Message;
 use crate::device_view::DeviceEvent::{ConnectedEvent, DeviceConnect, DeviceDisconnect};
 use crate::device_view::State::{Connected, Connecting, Disconnected};
+use crate::Message;
 use btleplug::platform::PeripheralId;
-use iced::widget::{Column, button, container, text};
+use iced::widget::{button, container, text, Column};
 use iced::{Element, Length, Task};
 
 enum State {
@@ -26,6 +26,13 @@ impl DeviceView {
     pub fn new() -> Self {
         Self {
             state: Disconnected,
+        }
+    }
+
+    pub fn connected_device(&self) -> Option<&PeripheralId> {
+        match &self.state {
+            Connected(id) => Some(id),
+            _ => None,
         }
     }
 
@@ -59,6 +66,8 @@ impl DeviceView {
 
     pub fn view(&self) -> Element<'static, Message> {
         let mut main_col = Column::new();
+
+        main_col = main_col.push(button("<-- Back").on_press(Message::NavigationBack));
 
         match &self.state {
             Disconnected => {

@@ -5,14 +5,16 @@ mod device_list_view;
 mod device_view;
 mod discovery;
 
-use crate::Message::{Device, Discovery, WindowEvent};
 use crate::device_list_view::DeviceListView;
 use crate::device_view::{DeviceEvent, DeviceView};
-use crate::discovery::{DiscoveryEvent, ble_discovery};
+use crate::discovery::{ble_discovery, DiscoveryEvent};
+use crate::Message::{Device, Discovery, NavigationBack, WindowEvent};
 use iced::{Element, Pixels, Settings, Size, Subscription, Task, Theme};
+use std::cmp::PartialEq;
 
 const MESHCHAT_ID: &str = "meshchat";
 
+#[derive(PartialEq)]
 enum View {
     DeviceList,
     Device,
@@ -27,6 +29,7 @@ struct MeshChat {
 /// These are the messages that MeshChat responds to
 #[derive(Debug, Clone)]
 pub enum Message {
+    NavigationBack,
     WindowEvent(iced::Event),
     Discovery(DiscoveryEvent),
     Device(DeviceEvent),
@@ -68,6 +71,12 @@ impl MeshChat {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
+            NavigationBack => {
+                if self.view == View::Device {
+                    self.view = View::DeviceList;
+                }
+                Task::none()
+            }
             WindowEvent(_) => Task::none(),
             Discovery(discovery_event) => self.device_list_view.update(discovery_event),
             Device(device_event) => {
@@ -84,7 +93,9 @@ impl MeshChat {
 
     fn view(&self) -> Element<'_, Message> {
         match self.view {
-            View::DeviceList => self.device_list_view.view(),
+            View::DeviceList => self
+                .device_list_view
+                .view(self.device_view.connected_device()),
             View::Device => self.device_view.view(),
         }
     }

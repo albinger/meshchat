@@ -1,9 +1,9 @@
+use crate::device_view::DeviceEvent::{DeviceConnect, DeviceDisconnect};
+use crate::discovery::DiscoveryEvent;
 use crate::Message;
 use crate::Message::Device;
-use crate::device_view::DeviceEvent::DeviceConnect;
-use crate::discovery::DiscoveryEvent;
 use btleplug::platform::PeripheralId;
-use iced::widget::{Column, button, container, text};
+use iced::widget::{button, container, text, Column, Row};
 use iced::{Element, Length, Task};
 use std::collections::HashMap;
 
@@ -27,12 +27,24 @@ impl DeviceListView {
         Task::none()
     }
 
-    pub fn view(&self) -> Element<'static, Message> {
+    pub fn view(&self, connected_device: Option<&PeripheralId>) -> Element<'static, Message> {
         let mut main_col = Column::new();
+        main_col = main_col.push(text("Scanning...Available devices:"));
 
         for (id, name) in &self.devices {
-            main_col = main_col
-                .push(button(text(name.clone())).on_press(Device(DeviceConnect(id.clone()))));
+            let mut device_row = Row::new();
+            let mut device_button = button(text(name.clone()));
+            if let Some(connected_device) = connected_device {
+                if connected_device == id {
+                    device_row = device_row.push(device_button);
+                    device_row = device_row
+                        .push(button("Disconnect").on_press(Device(DeviceDisconnect(id.clone()))));
+                }
+            } else {
+                device_button = device_button.on_press(Device(DeviceConnect(id.clone())));
+                device_row = device_row.push(device_button);
+            }
+            main_col = main_col.push(device_row);
         }
 
         let content = container(main_col)

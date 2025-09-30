@@ -6,7 +6,7 @@ readme = "README.md"
 repository = "https://github.com/andrewdavidmackenzie/meshchat"
 
 [dependencies]
-meshtastic = { version = "0.1.7", features = ["bluetooth-le"] }
+meshtastic = { version = "0.1.7", git = "https://github.com/lukipuki/meshtastic-rust.git", branch = "ble-scan", features = ["bluetooth-le"] }
 tokio = "1.47.1"
 btleplug = { version = "0.11.7" }
 uuid = { version = "1.12.1" }
