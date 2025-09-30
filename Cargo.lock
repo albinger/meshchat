@@ -1991,6 +1991,8 @@ dependencies = [
 [[package]]
 name = "meshtastic"
 version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "89f474b7f41f74f2b5d46aec08735d1e426efd3ddb927b0cec9fea77367d02e0"
 dependencies = [
  "bluez-async",
  "btleplug",
