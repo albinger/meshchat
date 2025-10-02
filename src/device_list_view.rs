@@ -1,3 +1,4 @@
+use crate::device_view::ConnectionState;
 use crate::device_view::DeviceEvent::{DeviceConnect, DeviceDisconnect};
 use crate::discovery::{compare_bleid, DiscoveryEvent};
 use crate::Message;
@@ -29,21 +30,35 @@ impl DeviceListView {
         Task::none()
     }
 
-    pub fn view(&self, connected_device: Option<&BleId>) -> Element<'static, Message> {
+    pub fn view(&self, connection_state: ConnectionState) -> Element<'static, Message> {
         let mut main_col = Column::new();
         main_col = main_col.push(text("Scanning...Available devices:"));
 
         for id in &self.devices {
             let mut device_row = Row::new();
             device_row = device_row.push(text(id.to_string()));
-            if let Some(connected_device) = connected_device {
-                if compare_bleid(connected_device, id) {
-                    device_row = device_row
-                        .push(button("Disconnect").on_press(Device(DeviceDisconnect(id.clone()))));
+            match &connection_state {
+                ConnectionState::Connected(connected_device) => {
+                    if compare_bleid(connected_device, id) {
+                        device_row = device_row.push(
+                            button("Disconnect").on_press(Device(DeviceDisconnect(id.clone()))),
+                        );
+                    }
                 }
-            } else {
-                device_row =
-                    device_row.push(button("Connect").on_press(Device(DeviceConnect(id.clone()))));
+                ConnectionState::Disconnected => {
+                    device_row = device_row
+                        .push(button("Connect").on_press(Device(DeviceConnect(id.clone()))));
+                }
+                ConnectionState::Connecting(connecting_device) => {
+                    if compare_bleid(connecting_device, id) {
+                        device_row = device_row.push(text("Connecting"));
+                    }
+                }
+                ConnectionState::Disconnecting(disconnecting_device) => {
+                    if compare_bleid(disconnecting_device, id) {
+                        device_row = device_row.push(text("Disconnecting"));
+                    }
+                }
             }
             main_col = main_col.push(device_row);
         }

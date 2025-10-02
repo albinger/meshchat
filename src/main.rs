@@ -7,18 +7,22 @@ mod device_view;
 mod discovery;
 
 use crate::device_list_view::DeviceListView;
-use crate::device_view::{DeviceEvent, DeviceView};
+use crate::device_view::{ConnectionState, DeviceEvent, DeviceView};
 use crate::discovery::{ble_discovery, DiscoveryEvent};
-use crate::Message::{Device, Discovery, Exit, NavigationBack, WindowEvent};
+use crate::Message::{Device, Discovery, Exit, Navigation, WindowEvent};
 use iced::{window, Element, Subscription, Task};
 use std::cmp::PartialEq;
-
-const MESHCHAT_ID: &str = "meshchat";
 
 #[derive(PartialEq)]
 enum View {
     DeviceList,
     Device,
+}
+
+#[derive(Debug, Clone)]
+pub enum NavigationMessage {
+    Back,
+    Connected,
 }
 
 struct MeshChat {
@@ -30,7 +34,7 @@ struct MeshChat {
 /// These are the messages that MeshChat responds to
 #[derive(Debug, Clone)]
 pub enum Message {
-    NavigationBack,
+    Navigation(NavigationMessage),
     WindowEvent(iced::Event),
     Discovery(DiscoveryEvent),
     Device(DeviceEvent),
@@ -49,7 +53,7 @@ impl MeshChat {
     fn new() -> (Self, Task<Message>) {
         (
             Self {
-                view: View::DeviceList,
+                view: View::DeviceList, // Make the initial view the device list
                 device_list_view: DeviceListView::new(),
                 device_view: DeviceView::new(),
             },
@@ -58,20 +62,28 @@ impl MeshChat {
     }
 
     fn title(&self) -> String {
+        // Can enhance with the number of unread messages or something
         "MeshChat".to_string()
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            NavigationBack => {
-                if self.view == View::Device {
-                    self.view = View::DeviceList;
+            Navigation(navigation_message) => {
+                match navigation_message {
+                    NavigationMessage::Back => {
+                        if self.view == View::Device {
+                            self.view = View::DeviceList;
+                        }
+                    }
+                    NavigationMessage::Connected => {
+                        self.view = View::Device;
+                    }
                 }
                 Task::none()
             }
             WindowEvent(event) => {
                 if let iced::Event::Window(window::Event::CloseRequested) = event {
-                    if let Some(id) = self.device_view.connected_device() {
+                    if let ConnectionState::Connected(id) = self.device_view.connection_state() {
                         Task::perform(comms::do_disconnect(id.clone()), |_result| Exit)
                     } else {
                         window::get_latest().and_then(window::close)
@@ -81,15 +93,7 @@ impl MeshChat {
                 }
             }
             Discovery(discovery_event) => self.device_list_view.update(discovery_event),
-            Device(device_event) => {
-                let (show_device_view, task) = self.device_view.update(device_event);
-                if show_device_view {
-                    self.view = View::Device;
-                } else {
-                    self.view = View::DeviceList;
-                };
-                task
-            }
+            Device(device_event) => self.device_view.update(device_event),
             Exit => window::get_latest().and_then(window::close),
         }
     }
@@ -98,7 +102,7 @@ impl MeshChat {
         match self.view {
             View::DeviceList => self
                 .device_list_view
-                .view(self.device_view.connected_device()),
+                .view(self.device_view.connection_state()),
             View::Device => self.device_view.view(),
         }
     }

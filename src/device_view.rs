@@ -1,13 +1,14 @@
+use crate::device_view::ConnectionState::{Connected, Connecting, Disconnected, Disconnecting};
 use crate::device_view::DeviceEvent::{
     ConnectedEvent, DeviceConnect, DeviceDisconnect, DisconnectedEvent,
 };
-use crate::device_view::State::{Connected, Connecting, Disconnected, Disconnecting};
-use crate::{comms, Message};
+use crate::{comms, Message, NavigationMessage};
 use iced::widget::{button, container, text, Column};
 use iced::{Element, Length, Task};
 use meshtastic::utils::stream::BleId;
 
-enum State {
+#[derive(Clone)]
+pub enum ConnectionState {
     Disconnected,
     Connecting(BleId),
     Connected(BleId),
@@ -23,51 +24,45 @@ pub enum DeviceEvent {
 }
 
 pub struct DeviceView {
-    state: State,
+    connection_state: ConnectionState,
 }
+async fn empty() {}
 
 impl DeviceView {
     pub fn new() -> Self {
         Self {
-            state: Disconnected,
+            connection_state: Disconnected,
         }
     }
 
-    pub fn connected_device(&self) -> Option<&BleId> {
-        match &self.state {
-            Connected(id) => Some(id),
-            _ => None,
-        }
+    pub fn connection_state(&self) -> ConnectionState {
+        self.connection_state.clone()
     }
 
     /// Return a true value to show we can show the device view, false for main to decide
-    pub fn update(&mut self, device_event: DeviceEvent) -> (bool, Task<Message>) {
+    pub fn update(&mut self, device_event: DeviceEvent) -> Task<Message> {
         match device_event {
             DeviceConnect(id) => {
-                self.state = Connecting(id.clone());
-                (
-                    true,
-                    Task::perform(comms::do_connect(id.clone()), |result| {
-                        Message::Device(ConnectedEvent(result.unwrap()))
-                    }),
-                )
+                self.connection_state = Connecting(id.clone());
+                Task::perform(comms::do_connect(id.clone()), |result| {
+                    Message::Device(ConnectedEvent(result.unwrap()))
+                })
             }
             DeviceDisconnect(id) => {
-                self.state = Disconnecting(id.clone());
-                (
-                    true,
-                    Task::perform(comms::do_disconnect(id.clone()), |result| {
-                        Message::Device(DisconnectedEvent(result.unwrap()))
-                    }),
-                )
+                self.connection_state = Disconnecting(id.clone());
+                Task::perform(comms::do_disconnect(id.clone()), |result| {
+                    Message::Device(DisconnectedEvent(result.unwrap()))
+                })
             }
             ConnectedEvent(id) => {
-                self.state = Connected(id);
-                (true, Task::none())
+                self.connection_state = Connected(id);
+                Task::perform(empty(), |_| {
+                    Message::Navigation(NavigationMessage::Connected)
+                })
             }
             DisconnectedEvent(_) => {
-                self.state = Disconnected;
-                (false, Task::none())
+                self.connection_state = Disconnected;
+                Task::perform(empty(), |_| Message::Navigation(NavigationMessage::Back))
             }
         }
     }
@@ -75,9 +70,10 @@ impl DeviceView {
     pub fn view(&self) -> Element<'static, Message> {
         let mut main_col = Column::new();
 
-        main_col = main_col.push(button("<-- Back").on_press(Message::NavigationBack));
+        main_col = main_col
+            .push(button("<-- Back").on_press(Message::Navigation(NavigationMessage::Back)));
 
-        match &self.state {
+        match &self.connection_state {
             Disconnected => {
                 main_col = main_col.push(text("disconnected"));
             }
@@ -92,7 +88,7 @@ impl DeviceView {
                     button("Disconnect").on_press(Message::Device(DeviceDisconnect(id.clone()))),
                 );
             }
-            State::Disconnecting(id) => {
+            Disconnecting(id) => {
                 main_col = main_col.push(text(format!("disconnecting from : {id}")));
             }
         }
