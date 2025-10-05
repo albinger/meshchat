@@ -1,5 +1,5 @@
 use crate::device_view::ConnectionState;
-use crate::device_view::DeviceEvent::{DeviceConnect, DeviceDisconnect};
+use crate::device_view::DeviceViewMessage::{DeviceConnect, DeviceDisconnect};
 use crate::discovery::{compare_bleid, DiscoveryEvent};
 use crate::Message;
 use crate::Message::Device;

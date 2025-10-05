@@ -1,13 +1,14 @@
 //! MeshChat is an iced GUI app that uses the meshtastic "rust" crate to discover and control
 //! meshtastic compatible radios connected to the host running it
 
-mod comms;
 mod device_list_view;
+mod device_subscription;
 mod device_view;
 mod discovery;
 
 use crate::device_list_view::DeviceListView;
-use crate::device_view::{DeviceEvent, DeviceView};
+use crate::device_view::ConnectionState::Connected;
+use crate::device_view::{DeviceView, DeviceViewMessage};
 use crate::discovery::{ble_discovery, DiscoveryEvent};
 use crate::Message::{Device, Discovery, Exit, Navigation, WindowEvent};
 use iced::{window, Element, Event, Subscription, Task};
@@ -22,7 +23,7 @@ enum View {
 #[derive(Debug, Clone)]
 pub enum NavigationMessage {
     Back,
-    Connected,
+    Connecting,
 }
 
 struct MeshChat {
@@ -37,7 +38,7 @@ pub enum Message {
     Navigation(NavigationMessage),
     WindowEvent(Event),
     Discovery(DiscoveryEvent),
-    Device(DeviceEvent),
+    Device(DeviceViewMessage),
     Exit,
 }
 
@@ -91,6 +92,7 @@ impl MeshChat {
         let mut subscriptions = vec![
             iced::event::listen().map(WindowEvent),
             Subscription::run(ble_discovery).map(Discovery),
+            self.device_view.subscription().map(Device),
         ];
 
         Subscription::batch(subscriptions)
@@ -103,7 +105,7 @@ impl MeshChat {
                     self.view = View::DeviceList;
                 }
             }
-            NavigationMessage::Connected => {
+            NavigationMessage::Connecting => {
                 self.view = View::Device;
             }
         }
@@ -112,8 +114,9 @@ impl MeshChat {
 
     fn window_handler(&mut self, event: Event) -> Task<Message> {
         if let Event::Window(window::Event::CloseRequested) = event {
-            if let Some(id) = self.device_view.connected() {
-                self.device_view.disconnect(&id)
+            if let Connected(_id) = self.device_view.connection_state().clone() {
+                // TODO send message to subscription to request we disconnect
+                Task::none()
             } else {
                 window::get_latest().and_then(window::close)
             }
