@@ -30,7 +30,7 @@ impl DeviceListView {
         Task::none()
     }
 
-    pub fn view(&self, connection_state: ConnectionState) -> Element<'static, Message> {
+    pub fn view(&self, connection_state: &ConnectionState) -> Element<'static, Message> {
         let mut main_col = Column::new();
         main_col = main_col.push(text("Scanning...Available devices:"));
 
@@ -38,8 +38,8 @@ impl DeviceListView {
             let mut device_row = Row::new();
             device_row = device_row.push(text(id.to_string()));
             match &connection_state {
-                ConnectionState::Connected(connected_device) => {
-                    if compare_bleid(connected_device, id) {
+                ConnectionState::Connected(connected_device_id) => {
+                    if compare_bleid(connected_device_id, id) {
                         device_row = device_row.push(
                             button("Disconnect").on_press(Device(DeviceDisconnect(id.clone()))),
                         );

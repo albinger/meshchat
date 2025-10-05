@@ -5,7 +5,10 @@ use crate::device_view::DeviceEvent::{
 use crate::{comms, Message, NavigationMessage};
 use iced::widget::{button, container, text, Column};
 use iced::{Element, Length, Task};
+use meshtastic::api::ConnectedStreamApi;
+use meshtastic::packet::PacketReceiver;
 use meshtastic::utils::stream::BleId;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub enum ConnectionState {
@@ -19,12 +22,14 @@ pub enum ConnectionState {
 pub enum DeviceEvent {
     DeviceConnect(BleId),
     DeviceDisconnect(BleId),
-    ConnectedEvent(BleId),
+    ConnectedEvent(BleId, Arc<PacketReceiver>, Arc<ConnectedStreamApi>),
     DisconnectedEvent(BleId),
 }
 
 pub struct DeviceView {
-    connection_state: ConnectionState,
+    pub connection_state: ConnectionState,
+    packet_receiver: Option<Arc<PacketReceiver>>,
+    stream_api: Option<Arc<ConnectedStreamApi>>,
 }
 async fn empty() {}
 
@@ -32,11 +37,20 @@ impl DeviceView {
     pub fn new() -> Self {
         Self {
             connection_state: Disconnected,
+            packet_receiver: None,
+            stream_api: None,
         }
     }
 
-    pub fn connection_state(&self) -> ConnectionState {
-        self.connection_state.clone()
+    pub fn connected(&self) -> Option<BleId> {
+        match &self.connection_state {
+            Connected(id) => Some(id.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn connection_state(&self) -> &ConnectionState {
+        &self.connection_state
     }
 
     /// Return a true value to show we can show the device view, false for main to decide
@@ -44,17 +58,25 @@ impl DeviceView {
         match device_event {
             DeviceConnect(id) => {
                 self.connection_state = Connecting(id.clone());
-                Task::perform(comms::do_connect(id.clone()), |result| {
-                    Message::Device(ConnectedEvent(result.unwrap()))
+                Task::perform(comms::do_connect(id.clone()), move |result| {
+                    let (packet_receiver, stream_api) = result.unwrap();
+                    Message::Device(ConnectedEvent(
+                        id.clone(),
+                        Arc::new(packet_receiver),
+                        Arc::new(stream_api),
+                    ))
                 })
             }
-            DeviceDisconnect(id) => {
-                self.connection_state = Disconnecting(id.clone());
-                Task::perform(comms::do_disconnect(id.clone()), |result| {
-                    Message::Device(DisconnectedEvent(result.unwrap()))
-                })
+            DeviceDisconnect(_) => {
+                if let Some(id) = self.connected() {
+                    self.disconnect(&id)
+                } else {
+                    Task::none() // TODO report an error?
+                }
             }
-            ConnectedEvent(id) => {
+            ConnectedEvent(id, packet_receiver, stream_api) => {
+                self.packet_receiver = Some(packet_receiver);
+                self.stream_api = Some(stream_api);
                 self.connection_state = Connected(id);
                 Task::perform(empty(), |_| {
                     Message::Navigation(NavigationMessage::Connected)
@@ -65,6 +87,16 @@ impl DeviceView {
                 Task::perform(empty(), |_| Message::Navigation(NavigationMessage::Back))
             }
         }
+    }
+
+    pub fn disconnect(&mut self, id: &BleId) -> Task<Message> {
+        self.connection_state = Disconnecting(id.clone());
+        self.packet_receiver.take();
+        let stream_api = self.stream_api.take().unwrap();
+        Task::perform(
+            comms::do_disconnect(id.clone(), Arc::into_inner(stream_api).unwrap()),
+            |result| Message::Device(DisconnectedEvent(result.unwrap())),
+        )
     }
 
     pub fn view(&self) -> Element<'static, Message> {

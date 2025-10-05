@@ -7,7 +7,7 @@ mod device_view;
 mod discovery;
 
 use crate::device_list_view::DeviceListView;
-use crate::device_view::{ConnectionState, DeviceEvent, DeviceView};
+use crate::device_view::{DeviceEvent, DeviceView};
 use crate::discovery::{ble_discovery, DiscoveryEvent};
 use crate::Message::{Device, Discovery, Exit, Navigation, WindowEvent};
 use iced::{window, Element, Event, Subscription, Task};
@@ -35,7 +35,7 @@ struct MeshChat {
 #[derive(Debug, Clone)]
 pub enum Message {
     Navigation(NavigationMessage),
-    WindowEvent(iced::Event),
+    WindowEvent(Event),
     Discovery(DiscoveryEvent),
     Device(DeviceEvent),
     Exit,
@@ -112,8 +112,8 @@ impl MeshChat {
 
     fn window_handler(&mut self, event: Event) -> Task<Message> {
         if let Event::Window(window::Event::CloseRequested) = event {
-            if let ConnectionState::Connected(id) = self.device_view.connection_state() {
-                Task::perform(comms::do_disconnect(id.clone()), |_result| Exit)
+            if let Some(id) = self.device_view.connected() {
+                self.device_view.disconnect(&id)
             } else {
                 window::get_latest().and_then(window::close)
             }
