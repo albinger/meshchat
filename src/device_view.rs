@@ -142,9 +142,6 @@ impl DeviceView {
     pub fn view(&self) -> Element<'static, Message> {
         let mut main_col = Column::new();
 
-        main_col = main_col
-            .push(button("<-- Back").on_press(Message::Navigation(NavigationMessage::Back)));
-
         match &self.connection_state {
             Disconnected => {
                 main_col = main_col.push(text("disconnected"));

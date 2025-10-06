@@ -11,6 +11,7 @@ use crate::device_view::ConnectionState::Connected;
 use crate::device_view::{DeviceView, DeviceViewMessage};
 use crate::discovery::{ble_discovery, DiscoveryEvent};
 use crate::Message::{Device, Discovery, Exit, Navigation, WindowEvent};
+use iced::widget::{button, Column, Row};
 use iced::{window, Element, Event, Subscription, Task};
 use std::cmp::PartialEq;
 
@@ -78,12 +79,27 @@ impl MeshChat {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        match self.view {
-            View::DeviceList => self
-                .device_list_view
-                .view(self.device_view.connection_state()),
-            View::Device => self.device_view.view(),
+        let (inner, back) = match self.view {
+            View::DeviceList => (
+                self.device_list_view
+                    .view(self.device_view.connection_state()),
+                false,
+            ),
+            View::Device => (self.device_view.view(), true),
+        };
+
+        let mut outer = Column::new();
+        let mut header = Row::new();
+
+        if back {
+            header = header
+                .push(button("<-- Back").on_press(Message::Navigation(NavigationMessage::Back)));
         }
+
+        outer = outer.push(header);
+        outer = outer.push(inner);
+
+        outer.into()
     }
 
     /// Subscribe to events from Discover and from Windows
