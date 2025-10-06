@@ -210,7 +210,7 @@ impl DeviceView {
                 settings.name.clone()
             };
             channel_row = channel_row.push(text(name).shaping(text::Shaping::Advanced));
-            channel_row = channel_row.push(text(packets.len()))
+            channel_row = channel_row.push(text(format!(" ({})", packets.len())))
         }
 
         channel_row
