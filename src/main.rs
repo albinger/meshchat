@@ -101,7 +101,7 @@ impl MeshChat {
                 header = header.push(text("Disconnected"));
             }
             Connecting(id) => {
-                header = header.push(text(format!("Connecting to {}", id.to_string())));
+                header = header.push(text(format!("Connecting to {}", id)));
             }
             Connected(id) => {
                 header = header.push(text("Connected to "));
@@ -111,7 +111,7 @@ impl MeshChat {
                 );
             }
             Disconnecting(id) => {
-                header = header.push(text(format!("Disconnecting from {}", id.to_string())));
+                header = header.push(text(format!("Disconnecting from {}", id)));
             }
         }
 

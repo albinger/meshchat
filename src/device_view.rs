@@ -194,7 +194,7 @@ impl DeviceView {
     fn channel_row(
         primary: bool,
         channel: &Channel,
-        packets: &Vec<MeshPacket>,
+        packets: &[MeshPacket],
     ) -> Row<'static, Message> {
         let mut channel_row = Row::new();
         if primary {
