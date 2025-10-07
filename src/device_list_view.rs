@@ -33,6 +33,7 @@ impl DeviceListView {
     pub fn view(&self, connection_state: &ConnectionState) -> Element<'static, Message> {
         let mut main_col = Column::new();
         main_col = main_col.push(text("Scanning...Available devices:"));
+        // TODO add a scrollable area in case there are a lot of devices
 
         for id in &self.devices {
             let mut device_row = Row::new();

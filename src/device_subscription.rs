@@ -88,7 +88,6 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
 }
 
 async fn do_connect(id: &BleId) -> Result<(PacketReceiver, ConnectedStreamApi), anyhow::Error> {
-    println!("Connecting to {}", id);
     let ble_stream = utils::stream::build_ble_stream(id, Duration::from_secs(4)).await?;
     let stream_api = StreamApi::new();
     let (packet_receiver, stream_api) = stream_api.connect(ble_stream).await;
@@ -98,7 +97,6 @@ async fn do_connect(id: &BleId) -> Result<(PacketReceiver, ConnectedStreamApi), 
 }
 
 async fn do_disconnect(stream_api: ConnectedStreamApi) -> Result<(), anyhow::Error> {
-    println!("Disconnecting");
     stream_api
         .disconnect()
         .await
