@@ -60,6 +60,14 @@ fn main() -> iced::Result {
         .run_with(MeshChat::new)
 }
 
+pub fn name_from_id(id: &BleId) -> String {
+    match id {
+        BleId::Name(name) => name.to_string(),
+        BleId::MacAddress(mac) => mac.to_string(),
+        BleId::NameAndMac(name, _) => name.to_string(),
+    }
+}
+
 impl MeshChat {
     fn new() -> (Self, Task<Message>) {
         (
@@ -86,9 +94,14 @@ impl MeshChat {
             Device(device_event) => self.device_view.update(device_event),
             Exit => window::get_latest().and_then(window::close),
             NewConfig(config) => {
-                println!("New config was loaded: {config:?}");
                 self.config = config;
-                Task::none()
+                if let Some(name) = &self.config.device_name {
+                    let id = BleId::from_name(name);
+                    self.device_view
+                        .update(DeviceViewMessage::ConnectRequest(id))
+                } else {
+                    Task::none()
+                }
             }
             AppError(e) => {
                 eprintln!("{e}");
@@ -97,20 +110,12 @@ impl MeshChat {
             Message::None => Task::none(),
             Message::SaveConfig => {
                 if let Connected(id) = self.device_view.connection_state() {
-                    self.config.device_id = Some(Self::name_from_id(id));
+                    self.config.device_name = Some(name_from_id(id));
                     save_config(self.config.clone())
                 } else {
                     Task::none()
                 }
             }
-        }
-    }
-
-    fn name_from_id(id: &BleId) -> String {
-        match id {
-            BleId::Name(name) => name.to_string(),
-            BleId::MacAddress(mac) => mac.to_string(),
-            BleId::NameAndMac(name, _) => name.to_string(),
         }
     }
 
@@ -136,21 +141,18 @@ impl MeshChat {
                 header = header.push(text("Disconnected"));
             }
             Connecting(id) => {
-                header = header.push(text(format!("Connecting to {}", Self::name_from_id(id))));
+                header = header.push(text(format!("Connecting to {}", name_from_id(id))));
             }
             Connected(id) => {
                 // TODO Breadcrumbs style?
                 header = header.push(text("Connected to "));
                 header = header.push(
-                    button(text(Self::name_from_id(id)))
+                    button(text(name_from_id(id)))
                         .on_press(Navigation(NavigationMessage::DeviceView)),
                 );
             }
             Disconnecting(id) => {
-                header = header.push(text(format!(
-                    "Disconnecting from {}",
-                    Self::name_from_id(id)
-                )));
+                header = header.push(text(format!("Disconnecting from {}", name_from_id(id))));
             }
         }
 

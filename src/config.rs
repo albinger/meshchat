@@ -3,11 +3,12 @@ use directories::ProjectDirs;
 use futures_lite::io::AsyncWriteExt;
 use iced::Task;
 use serde::{Deserialize, Serialize};
+use smol::fs::File;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
-    pub device_id: Option<String>,
+    pub device_name: Option<String>,
     pub channel_name: Option<String>,
 }
 
@@ -17,15 +18,16 @@ async fn load(config_path: PathBuf) -> Result<Config, anyhow::Error> {
 }
 
 async fn save(config_path: PathBuf, config: Config) -> Result<(), anyhow::Error> {
-    let mut config_file = smol::fs::File::open(&config_path).await?;
+    let mut config_file = File::create(&config_path).await?;
     let config_str = toml::to_string(&config)?;
-    Ok(config_file.write_all(config_str.as_bytes()).await?)
+    config_file.write_all(config_str.as_bytes()).await?;
+    Ok(config_file.sync_all().await?)
 }
 
 async fn create(config_path: PathBuf) -> Result<(), anyhow::Error> {
     smol::fs::create_dir_all(config_path.parent().unwrap()).await?;
-    let _ = smol::fs::File::create(&config_path).await?;
-    Ok(())
+    let config_file = File::create(&config_path).await?;
+    Ok(config_file.sync_all().await?)
 }
 
 pub fn save_config(config: Config) -> Task<Message> {
@@ -34,10 +36,7 @@ pub fn save_config(config: Config) -> Task<Message> {
 
         Task::perform(save(config_path, config), {
             |result| match result {
-                Ok(_) => {
-                    println!("Saved config file");
-                    Message::None
-                }
+                Ok(_) => Message::None,
                 Err(e) => Message::AppError(format!("Error saving config file: {e}")),
             }
         })

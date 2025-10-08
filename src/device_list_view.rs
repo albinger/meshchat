@@ -1,8 +1,8 @@
 use crate::device_view::ConnectionState;
 use crate::device_view::DeviceViewMessage::{ConnectRequest, DisconnectRequest};
 use crate::discovery::{compare_bleid, DiscoveryEvent};
-use crate::Message;
 use crate::Message::Device;
+use crate::{name_from_id, Message};
 use iced::widget::{button, container, text, Column, Row};
 use iced::{Element, Length, Task};
 use meshtastic::utils::stream::BleId;
@@ -32,12 +32,13 @@ impl DeviceListView {
 
     pub fn view(&self, connection_state: &ConnectionState) -> Element<'static, Message> {
         let mut main_col = Column::new();
+        // TODO make this a spinner in the view, or a bar back and fore - something visual
         main_col = main_col.push(text("Scanning...Available devices:"));
         // TODO add a scrollable area in case there are a lot of devices
 
         for id in &self.devices {
             let mut device_row = Row::new();
-            device_row = device_row.push(text(id.to_string()));
+            device_row = device_row.push(text(name_from_id(id)));
             match &connection_state {
                 ConnectionState::Connected(connected_device_id) => {
                     if compare_bleid(connected_device_id, id) {
