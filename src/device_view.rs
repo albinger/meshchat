@@ -176,7 +176,7 @@ impl DeviceView {
                 }
                 SubscriptionEvent::ConnectionError(error, detail) => {
                     eprintln!("Error: {} {}", error, detail);
-                    Task::none()
+                    Task::perform(empty(), |_| Message::AppError(error))
                 }
             },
             SendMessage => {
