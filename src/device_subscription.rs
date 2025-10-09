@@ -10,6 +10,9 @@ use iced::futures::{SinkExt, Stream, StreamExt};
 use iced::stream;
 use meshtastic::api::{ConnectedStreamApi, StreamApi};
 use meshtastic::packet::PacketReceiver;
+use meshtastic::protobufs::from_radio::PayloadVariant::{
+    Channel, ClientNotification, MyInfo, NodeInfo, Packet,
+};
 use meshtastic::protobufs::FromRadio;
 use meshtastic::utils;
 use meshtastic::utils::stream::BleId;
@@ -83,11 +86,21 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
                 }
                 Connected(id, packet_receiver) => {
                     while let Some(packet) = packet_receiver.recv().await {
-                        // TODO filter out all the types that we know the GUI is not interested in
-                        gui_sender
-                            .send(DevicePacket(Box::new(packet)))
-                            .await
-                            .unwrap_or_else(|e| eprintln!("Send error: {e}"));
+                        let payload_variant = packet.payload_variant.as_ref().unwrap();
+                        // Filter to only send packets UI is interested in
+                        if matches!(
+                            payload_variant,
+                            Packet(_)
+                                | MyInfo(_)
+                                | NodeInfo(_)
+                                | Channel(_)
+                                | ClientNotification(_)
+                        ) {
+                            gui_sender
+                                .send(DevicePacket(Box::new(packet)))
+                                .await
+                                .unwrap_or_else(|e| eprintln!("Send error: {e}"));
+                        }
                     }
 
                     // Disconnect

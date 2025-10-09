@@ -176,7 +176,8 @@ impl DeviceView {
                 }
                 SubscriptionEvent::ConnectionError(error, detail) => {
                     eprintln!("Error: {} {}", error, detail);
-                    Task::perform(empty(), |_| Message::AppError(error))
+                    let ec = error.clone();
+                    Task::perform(empty(), move |_| Message::AppError(ec.clone()))
                 }
             },
             SendMessage => {
