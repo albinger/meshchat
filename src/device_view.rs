@@ -2,7 +2,7 @@ use crate::channel_view::channel_view;
 use crate::config::Config;
 use crate::device_subscription::SubscriberMessage::{Connect, Disconnect, SendText};
 use crate::device_subscription::SubscriptionEvent::{
-    ConnectedEvent, DevicePacket, DisconnectedEvent, Ready,
+    ConnectedEvent, ConnectionError, DevicePacket, DisconnectedEvent, Ready, TextSent,
 };
 use crate::device_subscription::{SubscriberMessage, SubscriptionEvent};
 use crate::device_view::ConnectionState::{Connected, Connecting, Disconnected, Disconnecting};
@@ -196,11 +196,13 @@ impl DeviceView {
                     }
                     Task::none()
                 }
-                SubscriptionEvent::MessageSent => {
-                    // TODO Mark as sent in the UI
+                TextSent => {
+                    // TODO Mark as sent in the UI, and clear the message entry
+                    // Until we have some kind of queue of messages being sent pending confirmation
+                    self.message = String::new();
                     Task::none()
                 }
-                SubscriptionEvent::ConnectionError(error, detail) => {
+                ConnectionError(error, detail) => {
                     eprintln!("Error: {} {}", error, detail);
                     let ec = error.clone();
                     Task::perform(empty(), move |_| Message::AppError(ec.clone()))
@@ -208,10 +210,6 @@ impl DeviceView {
             },
             SendMessage => {
                 if let Some(channel_number) = self.channel_number {
-                    println!(
-                        "Sending message: {} to channel #{}",
-                        self.message, channel_number
-                    );
                     // TODO Add to messages in the channel for display, or wait for packet back from radio
                     // as a confirmation? Maybe add as sending status?
                     // Display it just above the text input until confirmed by arriving in channel?

@@ -1,7 +1,7 @@
 use crate::device_subscription::DeviceState::{Connected, Disconnected};
 use crate::device_subscription::SubscriberMessage::{Connect, Disconnect, Radio, SendText};
 use crate::device_subscription::SubscriptionEvent::{
-    ConnectedEvent, ConnectionError, DevicePacket, DisconnectedEvent,
+    ConnectedEvent, ConnectionError, DevicePacket, DisconnectedEvent, TextSent,
 };
 use anyhow::Context;
 use futures::SinkExt;
@@ -28,7 +28,7 @@ pub enum SubscriptionEvent {
     ConnectedEvent(BleId),
     DisconnectedEvent(BleId),
     DevicePacket(Box<FromRadio>),
-    MessageSent,
+    TextSent,
     ConnectionError(String, String),
 }
 
@@ -108,10 +108,11 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
                         match message {
                             Connect(_) => eprintln!("Already connected!"),
                             Disconnect => break,
-                            SendText(_text, _channel_number) => {
-                                /*
+                            SendText(text, channel_number) => {
+                                println!("SendText '{text}' to channel: {channel_number}");
                                 // TODO handle send errors and report to UI
                                 let api = stream_api.take().unwrap();
+                                /*
                                 let _ = api
                                     .send_text(
                                         &mut router,
@@ -121,14 +122,13 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
                                         MeshChannel::from(channel_number as u32),
                                     )
                                     .await;
+                                 */
                                 gui_sender
-                                    .send(MessageSent)
+                                    .send(TextSent)
                                     .await
                                     .unwrap_or_else(|e| eprintln!("Send error: {e}"));
 
                                 let _none = stream_api.replace(api);
-
-                                 */
                             }
                             Radio(packet) => {
                                 let payload_variant = packet.payload_variant.as_ref().unwrap();
