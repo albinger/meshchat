@@ -2,18 +2,15 @@ use crate::channel_view::channel_view;
 use crate::config::Config;
 use crate::device_subscription::SubscriberMessage::{Connect, Disconnect, SendText};
 use crate::device_subscription::SubscriptionEvent::{
-    ConnectedEvent, DevicePacket, DisconnectedEvent, Ready,
+    ConnectedEvent, ConnectionError, DevicePacket, DisconnectedEvent, MessageSent, Ready,
 };
 use crate::device_subscription::{SubscriberMessage, SubscriptionEvent};
 use crate::device_view::ConnectionState::{Connected, Connecting, Disconnected, Disconnecting};
 use crate::device_view::DeviceViewMessage::{
-    ConnectRequest, DisconnectRequest, MessageInput, MessageSent, SendMessage, ShowChannel,
-    SubscriptionMessage,
+    ConnectRequest, DisconnectRequest, MessageInput, SendMessage, ShowChannel, SubscriptionMessage,
 };
 use crate::Message::Navigation;
 use crate::{device_subscription, name_from_id, Message, NavigationMessage};
-use iced::futures::channel::mpsc::Sender;
-use iced::futures::SinkExt;
 use iced::widget::scrollable::Scrollbar;
 use iced::widget::{button, scrollable, text, Column, Row};
 use iced::{Element, Task};
@@ -24,6 +21,7 @@ use meshtastic::protobufs::channel::Role::*;
 use meshtastic::protobufs::from_radio::PayloadVariant;
 use meshtastic::protobufs::{Channel, MeshPacket, NodeInfo};
 use meshtastic::utils::stream::BleId;
+use tokio::sync::mpsc::Sender;
 
 #[derive(Clone)]
 pub enum ConnectionState {
@@ -41,7 +39,6 @@ pub enum DeviceViewMessage {
     ShowChannel(i32),
     MessageInput(String),
     SendMessage,
-    MessageSent,
 }
 
 pub struct DeviceView {
@@ -54,16 +51,16 @@ pub struct DeviceView {
     pub message: String,                                  // Message typed in so far
 }
 
-async fn request_connection(mut sender: Sender<SubscriberMessage>, name: String) {
+async fn request_connection(sender: Sender<SubscriberMessage>, name: String) {
     let id = BleId::from_name(&name);
     let _ = sender.send(Connect(id)).await;
 }
 
-async fn request_send(mut sender: Sender<SubscriberMessage>, text: String, channel: i32) {
+async fn request_send(sender: Sender<SubscriberMessage>, text: String, channel: i32) {
     let _ = sender.send(SendText(text, channel)).await;
 }
 
-async fn request_disconnection(mut sender: Sender<SubscriberMessage>) {
+async fn request_disconnection(sender: Sender<SubscriberMessage>) {
     let _ = sender.send(Disconnect).await;
 }
 
@@ -120,6 +117,7 @@ impl DeviceView {
                     Task::none()
                 }
             }
+            // TODO move some of this to channel view?
             SubscriptionMessage(subscription_event) => match subscription_event {
                 ConnectedEvent(id) => {
                     let name = name_from_id(&id);
@@ -197,11 +195,13 @@ impl DeviceView {
                     }
                     Task::none()
                 }
-                SubscriptionEvent::MessageSent => {
-                    // TODO Mark as sent in the UI
+                MessageSent => {
+                    // TODO Mark as sent in the UI, and clear the message entry
+                    // Until we have some kind of queue of messages being sent pending confirmation
+                    self.message = String::new();
                     Task::none()
                 }
-                SubscriptionEvent::ConnectionError(error, detail) => {
+                ConnectionError(error, detail) => {
                     eprintln!("Error: {} {}", error, detail);
                     let ec = error.clone();
                     Task::perform(empty(), move |_| Message::AppError(ec.clone()))
@@ -209,15 +209,15 @@ impl DeviceView {
             },
             SendMessage => {
                 if let Some(channel_number) = self.channel_number {
-                    println!(
-                        "Sending message: {} to channel #{}",
-                        self.message, channel_number
-                    );
                     // TODO Add to messages in the channel for display, or wait for packet back from radio
                     // as a confirmation? Maybe add as sending status?
                     // Display it just above the text input until confirmed by arriving in channel?
                     // for now only sent to the subscription
                     let sender = self.subscription_sender.clone();
+                    // TODO add an id to the message, or get it back from the subscription to be
+                    // able to handle replies to it later. Get a timestamp and maybe sender id
+                    // when TextSent then add to the UI list of messages, interleaved with
+                    // those received using the timestamp
                     Task::perform(
                         request_send(sender.unwrap(), self.message.clone(), channel_number),
                         |_| Message::None,
@@ -228,11 +228,6 @@ impl DeviceView {
             }
             MessageInput(s) => {
                 self.message = s;
-                Task::none()
-            }
-            MessageSent => {
-                // TODO mark as sent in UI
-                self.message = String::new();
                 Task::none()
             }
         }
