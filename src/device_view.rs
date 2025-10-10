@@ -268,7 +268,6 @@ impl DeviceView {
     }
 
     pub fn view(&self) -> Element<'static, Message> {
-        // TODO add to the breadcrumbs and allow back to device view
         if let Some(channel_number) = self.channel_number
             && let Some((_channel, packets)) = &self.channels.get(channel_number as usize)
         {

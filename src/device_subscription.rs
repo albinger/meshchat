@@ -17,6 +17,7 @@ use meshtastic::protobufs::FromRadio;
 use meshtastic::utils;
 use meshtastic::utils::stream::BleId;
 use std::time::Duration;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[derive(Debug, Clone)]
 
@@ -84,8 +85,9 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
                         }
                     }
                 }
-                Connected(id, mut packet_receiver) => {
-                    while let Some(packet) = packet_receiver.recv().await {
+                Connected(id, packet_receiver) => {
+                    let mut stream = UnboundedReceiverStream::from(packet_receiver);
+                    while let Some(packet) = tokio_stream::StreamExt::next(&mut stream).await {
                         let payload_variant = packet.payload_variant.as_ref().unwrap();
                         // Filter to only send packets UI is interested in
                         if matches!(
