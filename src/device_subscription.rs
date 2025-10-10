@@ -4,9 +4,7 @@ use crate::device_subscription::SubscriptionEvent::{
     ConnectedEvent, ConnectionError, DevicePacket, DisconnectedEvent,
 };
 use anyhow::Context;
-use iced::futures::channel::mpsc;
-use iced::futures::channel::mpsc::Sender;
-use iced::futures::{SinkExt, Stream, StreamExt};
+use iced::futures::SinkExt;
 use iced::stream;
 use meshtastic::api::{ConnectedStreamApi, StreamApi};
 use meshtastic::packet::PacketReceiver;
@@ -16,8 +14,12 @@ use meshtastic::protobufs::from_radio::PayloadVariant::{
 use meshtastic::protobufs::FromRadio;
 use meshtastic::utils;
 use meshtastic::utils::stream::BleId;
+use std::pin::Pin;
 use std::time::Duration;
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::Sender;
 use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio_stream::{Stream, StreamExt};
 
 #[derive(Debug, Clone)]
 
@@ -58,6 +60,14 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
             .send(SubscriptionEvent::Ready(subscriber_sender.clone()))
             .await;
 
+        // Convert the channels to a `Stream`.
+        let mut subscriber_receiver = Box::pin(async_stream::stream! {
+              while let Some(item) = subscriber_receiver.recv().await {
+                  yield item;
+              }
+        })
+            as Pin<Box<dyn Stream<Item = SubscriberMessage> + Send>>;
+
         loop {
             match device_state {
                 Disconnected => {
@@ -86,8 +96,16 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
                     }
                 }
                 Connected(id, packet_receiver) => {
-                    let mut stream = UnboundedReceiverStream::from(packet_receiver);
-                    while let Some(packet) = tokio_stream::StreamExt::next(&mut stream).await {
+                    let mut radio_stream = UnboundedReceiverStream::from(packet_receiver);
+
+                    // TODO I can't merge the streams until I am connected and have the parket receiver unbounded receiver
+                    // But then, bing inside a loop, I get problems trying to move subscriber_receiver repeatedly and
+                    // the subscriber_receiver Stream can't be cloned
+                    let merged_stream = radio_stream.merge(subscriber_receiver);
+
+                    // TODO receive either types of message: FromRadio or SubscriberMessage from the merged stream
+                    // This is the code that works to handle the radio packets
+                    while let Some(packet) = StreamExt::next(&mut radio_stream).await {
                         let payload_variant = packet.payload_variant.as_ref().unwrap();
                         // Filter to only send packets UI is interested in
                         if matches!(
@@ -103,6 +121,12 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
                                 .await
                                 .unwrap_or_else(|e| eprintln!("Send error: {e}"));
                         }
+
+                        /*
+                           match subscriber_message {
+                               SendText(text, channel) => take steam_api and call send_text on it
+                           }
+                        */
                     }
 
                     // Disconnect
