@@ -36,7 +36,6 @@ struct MeshChat {
     view: View,
     device_list_view: DeviceListView,
     device_view: DeviceView,
-    config: Config,
 }
 
 /// These are the messages that MeshChat responds to
@@ -48,7 +47,7 @@ pub enum Message {
     Device(DeviceViewMessage),
     Exit,
     NewConfig(Config),
-    SaveConfig,
+    SaveConfig(Config),
     AppError(String),
     None,
 }
@@ -76,7 +75,6 @@ impl MeshChat {
                 view: View::DeviceList, // Make the initial view the device list
                 device_list_view: DeviceListView::new(),
                 device_view: DeviceView::new(),
-                config: Config::default(),
             },
             Task::batch(vec![load_config()]),
         )
@@ -95,11 +93,11 @@ impl MeshChat {
             Device(device_event) => self.device_view.update(device_event),
             Exit => window::get_latest().and_then(window::close),
             NewConfig(config) => {
-                self.config = config;
-                if let Some(name) = &self.config.device_name {
-                    let id = BleId::from_name(name);
-                    self.device_view
-                        .update(DeviceViewMessage::ConnectRequest(id))
+                if let Some(name) = &config.device_name {
+                    self.device_view.update(DeviceViewMessage::ConnectRequest(
+                        name.clone(),
+                        config.channel_number,
+                    ))
                 } else {
                     Task::none()
                 }
@@ -109,14 +107,7 @@ impl MeshChat {
                 Task::none()
             }
             Message::None => Task::none(),
-            Message::SaveConfig => {
-                if let Connected(id) = self.device_view.connection_state() {
-                    self.config.device_name = Some(name_from_id(id));
-                    save_config(self.config.clone())
-                } else {
-                    Task::none()
-                }
-            }
+            Message::SaveConfig(config) => save_config(config),
         }
     }
 

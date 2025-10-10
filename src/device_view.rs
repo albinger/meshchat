@@ -1,4 +1,5 @@
 use crate::channel_view::channel_view;
+use crate::config::Config;
 use crate::device_subscription::SubscriberMessage::{Connect, Disconnect, SendText};
 use crate::device_subscription::SubscriptionEvent::{
     ConnectedEvent, DevicePacket, DisconnectedEvent, Ready,
@@ -6,7 +7,8 @@ use crate::device_subscription::SubscriptionEvent::{
 use crate::device_subscription::{SubscriberMessage, SubscriptionEvent};
 use crate::device_view::ConnectionState::{Connected, Connecting, Disconnected, Disconnecting};
 use crate::device_view::DeviceViewMessage::{
-    ConnectRequest, DisconnectRequest, MessageInput, MessageSent, SendMessage, SubscriptionMessage,
+    ConnectRequest, DisconnectRequest, MessageInput, MessageSent, SendMessage, ShowChannel,
+    SubscriptionMessage,
 };
 use crate::Message::Navigation;
 use crate::{device_subscription, name_from_id, Message, NavigationMessage};
@@ -26,15 +28,15 @@ use meshtastic::utils::stream::BleId;
 #[derive(Clone)]
 pub enum ConnectionState {
     Disconnected,
-    Connecting(BleId),
-    Connected(BleId),
-    Disconnecting(BleId),
+    Connecting(String),
+    Connected(String),
+    Disconnecting(String),
 }
 
 #[derive(Debug, Clone)]
 pub enum DeviceViewMessage {
-    ConnectRequest(BleId),
-    DisconnectRequest(BleId),
+    ConnectRequest(String, Option<i32>),
+    DisconnectRequest(String),
     SubscriptionMessage(SubscriptionEvent),
     ShowChannel(i32),
     MessageInput(String),
@@ -48,11 +50,12 @@ pub struct DeviceView {
     my_node_num: Option<u32>,
     pub(crate) channels: Vec<(Channel, Vec<MeshPacket>)>, // Upto 8 - but maybe depends on firmware
     nodes: Vec<NodeInfo>,                                 // all nodes known to the connected radio
-    pub(crate) showing_channel: i32,                      // Channel numbers from 0 to 7
+    pub(crate) channel_number: Option<i32>,               // Channel numbers from 0 to 7
     pub message: String,                                  // Message typed in so far
 }
 
-async fn request_connection(mut sender: Sender<SubscriberMessage>, id: BleId) {
+async fn request_connection(mut sender: Sender<SubscriberMessage>, name: String) {
+    let id = BleId::from_name(&name);
     let _ = sender.send(Connect(id)).await;
 }
 
@@ -74,7 +77,7 @@ impl DeviceView {
             channels: vec![],
             nodes: vec![],
             my_node_num: None,
-            showing_channel: -1, // No channel
+            channel_number: None, // No channel is being shown by default
             message: String::new(),
         }
     }
@@ -86,35 +89,59 @@ impl DeviceView {
     /// Return a true value to show we can show the device view, false for main to decide
     pub fn update(&mut self, device_view_message: DeviceViewMessage) -> Task<Message> {
         match device_view_message {
-            ConnectRequest(id) => {
-                self.connection_state = Connecting(id.clone()); // TODO make state change depend on message back from subscription
+            ConnectRequest(name, channel_number) => {
+                // save the desired channel to show for when the connection is completed later
+                self.channel_number = channel_number;
+                self.connection_state = Connecting(name.clone()); // TODO make state change depend on message back from subscription
                 let sender = self.subscription_sender.clone();
-                Task::perform(request_connection(sender.unwrap(), id), |_| {
-                    Message::Navigation(NavigationMessage::DeviceView)
+                Task::perform(request_connection(sender.unwrap(), name.clone()), |_| {
+                    Navigation(NavigationMessage::DeviceView)
                 })
             }
-            DisconnectRequest(id) => {
-                self.connection_state = Disconnecting(id.clone()); // TODO make state change depend on message back from subscription
+            DisconnectRequest(name) => {
+                self.connection_state = Disconnecting(name); // TODO make state change depend on message back from subscription
                 // Send a message to the subscription to disconnect
                 let sender = self.subscription_sender.clone();
                 Task::perform(request_disconnection(sender.unwrap()), |_| {
-                    Message::Navigation(NavigationMessage::DevicesList)
+                    Navigation(NavigationMessage::DevicesList)
                 })
             }
-            DeviceViewMessage::ShowChannel(channel_num) => {
-                self.showing_channel = channel_num;
-                Task::none()
+            ShowChannel(channel_number) => {
+                if let Connected(name) = &self.connection_state {
+                    let device_name = Some(name.clone());
+                    self.channel_number = Some(channel_number);
+                    Task::perform(empty(), move |_| {
+                        Message::SaveConfig(Config {
+                            device_name: device_name.clone(),
+                            channel_number: Some(channel_number),
+                        })
+                    })
+                } else {
+                    Task::none()
+                }
             }
             SubscriptionMessage(subscription_event) => match subscription_event {
                 ConnectedEvent(id) => {
-                    self.connection_state = Connected(id);
-                    Task::perform(empty(), |_| Message::SaveConfig)
+                    let name = name_from_id(&id);
+                    self.connection_state = Connected(name);
+                    match self.channel_number {
+                        None => {
+                            let channel_number = self.channel_number;
+                            Task::perform(empty(), move |_| {
+                                Message::SaveConfig(Config {
+                                    device_name: Some(name_from_id(&id)),
+                                    channel_number,
+                                })
+                            })
+                        }
+                        Some(channel_number) => Task::perform(empty(), move |_| {
+                            Message::Device(ShowChannel(channel_number))
+                        }),
+                    }
                 }
                 DisconnectedEvent(_) => {
                     self.connection_state = Disconnected;
-                    Task::perform(empty(), |_| {
-                        Message::Navigation(NavigationMessage::DevicesList)
-                    })
+                    Task::perform(empty(), |_| Navigation(NavigationMessage::DevicesList))
                 }
                 Ready(sender) => {
                     self.subscription_sender = Some(sender);
@@ -181,19 +208,23 @@ impl DeviceView {
                 }
             },
             SendMessage => {
-                println!(
-                    "Sending message: {} to channel #{}",
-                    self.message, self.showing_channel
-                );
-                // TODO Add to messages in the channel for display, or wait for packet back from radio
-                // as a confirmation? Maybe add as sending status?
-                // Display it just above the text input until confirmed by arriving in channel?
-                // for now only sent to the subscription
-                let sender = self.subscription_sender.clone();
-                Task::perform(
-                    request_send(sender.unwrap(), self.message.clone(), self.showing_channel),
-                    |_| Message::None,
-                )
+                if let Some(channel_number) = self.channel_number {
+                    println!(
+                        "Sending message: {} to channel #{}",
+                        self.message, channel_number
+                    );
+                    // TODO Add to messages in the channel for display, or wait for packet back from radio
+                    // as a confirmation? Maybe add as sending status?
+                    // Display it just above the text input until confirmed by arriving in channel?
+                    // for now only sent to the subscription
+                    let sender = self.subscription_sender.clone();
+                    Task::perform(
+                        request_send(sender.unwrap(), self.message.clone(), channel_number),
+                        |_| Message::None,
+                    )
+                } else {
+                    Task::none()
+                }
             }
             MessageInput(s) => {
                 self.message = s;
@@ -210,7 +241,7 @@ impl DeviceView {
     pub fn header<'a>(
         &'a self,
         mut header: Row<'a, Message>,
-        connection_state: &ConnectionState,
+        connection_state: &'a ConnectionState,
     ) -> Row<'a, Message> {
         header = header
             .push(button("Devices").on_press(Navigation(NavigationMessage::DevicesList)))
@@ -218,27 +249,29 @@ impl DeviceView {
 
         header = match connection_state {
             Disconnected => header.push(text("Disconnected")),
-            Connecting(id) => header.push(text(format!("Connecting to {}", name_from_id(id)))),
+            Connecting(name) => header.push(text(format!("Connecting to {}", name))),
             // TODO add navigation to device when viewing a channel
-            Connected(id) => header.push(button(text(name_from_id(id)))),
-            Disconnecting(id) => {
-                header.push(text(format!("Disconnecting from {}", name_from_id(id))))
-            }
+            Connected(name) => header.push(button(text(name))),
+            Disconnecting(name) => header.push(text(format!("Disconnecting from {}", name))),
         };
 
-        if self.showing_channel >= 0 {
-            let channel_name =
-                Self::channel_name(&self.channels.get(self.showing_channel as usize).unwrap().0);
-            header.push(text(" / ")).push(button(text(channel_name)))
+        if let Some(channel_number) = self.channel_number {
+            if let Some((channel, _packets)) = &self.channels.get(channel_number as usize) {
+                let channel_name = Self::channel_name(channel);
+                header.push(text(" / ")).push(button(text(channel_name)))
+            } else {
+                header
+            }
         } else {
             header
         }
     }
 
     pub fn view(&self) -> Element<'static, Message> {
-        if self.showing_channel >= 0 {
-            // TODO add to the breadcrumbs and allow back to device view
-            let (_channel, packets) = self.channels.get(self.showing_channel as usize).unwrap();
+        // TODO add to the breadcrumbs and allow back to device view
+        if let Some(channel_number) = self.channel_number
+            && let Some((_channel, packets)) = &self.channels.get(channel_number as usize)
+        {
             channel_view(self, packets)
         } else {
             self.device_view()
@@ -307,9 +340,8 @@ impl DeviceView {
         let name = Self::channel_name(channel);
         channel_row = channel_row.push(text(name).shaping(text::Shaping::Advanced));
         channel_row = channel_row.push(text(format!(" ({})", packets.len())));
-        channel_row = channel_row.push(button(" Chat").on_press(Message::Device(
-            DeviceViewMessage::ShowChannel(channel.index),
-        )));
+        channel_row =
+            channel_row.push(button(" Chat").on_press(Message::Device(ShowChannel(channel.index))));
 
         channel_row
     }

@@ -9,7 +9,7 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
     pub device_name: Option<String>,
-    pub channel_name: Option<String>,
+    pub channel_number: Option<i32>,
 }
 
 async fn load(config_path: PathBuf) -> Result<Config, anyhow::Error> {

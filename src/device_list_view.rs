@@ -34,21 +34,19 @@ impl DeviceListView {
     pub fn header<'a>(
         &'a self,
         mut header: Row<'a, Message>,
-        connection_state: &ConnectionState,
+        connection_state: &'a ConnectionState,
     ) -> Row<'a, Message> {
         header = header.push(button("Devices")).push(text(" / "));
 
         match connection_state {
             Disconnected => header.push(text("Disconnected")),
-            Connecting(id) => header.push(text(format!("Connecting to {}", name_from_id(id)))),
-            Connected(id) => {
-                let breadcrumb = button(text(name_from_id(id)))
-                    .on_press(Navigation(NavigationMessage::DeviceView));
+            Connecting(name) => header.push(text(format!("Connecting to {}", name))),
+            Connected(name) => {
+                let breadcrumb =
+                    button(text(name)).on_press(Navigation(NavigationMessage::DeviceView));
                 header.push(breadcrumb)
             }
-            Disconnecting(id) => {
-                header.push(text(format!("Disconnecting from {}", name_from_id(id))))
-            }
+            Disconnecting(name) => header.push(text(format!("Disconnecting from {}", name))),
         }
     }
 
@@ -62,24 +60,26 @@ impl DeviceListView {
             let mut device_row = Row::new();
             device_row = device_row.push(text(name_from_id(id)));
             match &connection_state {
-                Connected(connected_device_id) => {
-                    if compare_bleid(connected_device_id, id) {
+                Connected(connected_device_name) => {
+                    if connected_device_name.eq(&name_from_id(id)) {
                         device_row = device_row.push(
-                            button("Disconnect").on_press(Device(DisconnectRequest(id.clone()))),
+                            button("Disconnect")
+                                .on_press(Device(DisconnectRequest(name_from_id(id)))),
                         );
                     }
                 }
                 Disconnected => {
-                    device_row = device_row
-                        .push(button("Connect").on_press(Device(ConnectRequest(id.clone()))));
+                    device_row = device_row.push(
+                        button("Connect").on_press(Device(ConnectRequest(name_from_id(id), None))),
+                    );
                 }
                 Connecting(connecting_device) => {
-                    if compare_bleid(connecting_device, id) {
+                    if connecting_device.eq(&name_from_id(id)) {
                         device_row = device_row.push(text("Connecting"));
                     }
                 }
                 Disconnecting(disconnecting_device) => {
-                    if compare_bleid(disconnecting_device, id) {
+                    if disconnecting_device.eq(&name_from_id(id)) {
                         device_row = device_row.push(text("Disconnecting"));
                     }
                 }
