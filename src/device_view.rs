@@ -12,8 +12,6 @@ use crate::device_view::DeviceViewMessage::{
 };
 use crate::Message::Navigation;
 use crate::{device_subscription, name_from_id, Message, NavigationMessage};
-use iced::futures::channel::mpsc::Sender;
-use iced::futures::SinkExt;
 use iced::widget::scrollable::Scrollbar;
 use iced::widget::{button, scrollable, text, Column, Row};
 use iced::{Element, Task};
@@ -24,6 +22,7 @@ use meshtastic::protobufs::channel::Role::*;
 use meshtastic::protobufs::from_radio::PayloadVariant;
 use meshtastic::protobufs::{Channel, MeshPacket, NodeInfo};
 use meshtastic::utils::stream::BleId;
+use tokio::sync::mpsc::Sender;
 
 #[derive(Clone)]
 pub enum ConnectionState {
@@ -54,16 +53,16 @@ pub struct DeviceView {
     pub message: String,                                  // Message typed in so far
 }
 
-async fn request_connection(mut sender: Sender<SubscriberMessage>, name: String) {
+async fn request_connection(sender: Sender<SubscriberMessage>, name: String) {
     let id = BleId::from_name(&name);
     let _ = sender.send(Connect(id)).await;
 }
 
-async fn request_send(mut sender: Sender<SubscriberMessage>, text: String, channel: i32) {
+async fn request_send(sender: Sender<SubscriberMessage>, text: String, channel: i32) {
     let _ = sender.send(SendText(text, channel)).await;
 }
 
-async fn request_disconnection(mut sender: Sender<SubscriberMessage>) {
+async fn request_disconnection(sender: Sender<SubscriberMessage>) {
     let _ = sender.send(Disconnect).await;
 }
 

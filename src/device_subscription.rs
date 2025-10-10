@@ -4,7 +4,7 @@ use crate::device_subscription::SubscriptionEvent::{
     ConnectedEvent, ConnectionError, DevicePacket, DisconnectedEvent,
 };
 use anyhow::Context;
-use iced::futures::SinkExt;
+use futures::SinkExt;
 use iced::stream;
 use meshtastic::api::{ConnectedStreamApi, StreamApi};
 use meshtastic::packet::PacketReceiver;
@@ -16,8 +16,7 @@ use meshtastic::utils;
 use meshtastic::utils::stream::BleId;
 use std::pin::Pin;
 use std::time::Duration;
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc::{channel, Sender};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_stream::{Stream, StreamExt};
 
@@ -53,7 +52,7 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
         let mut stream_api: Option<ConnectedStreamApi> = None;
         //let router = MyRouter {};
 
-        let (subscriber_sender, mut subscriber_receiver) = mpsc::channel::<SubscriberMessage>(100);
+        let (subscriber_sender, mut subscriber_receiver) = channel::<SubscriberMessage>(100);
 
         // Send the event sender back to the GUI, so it can send messages
         let _ = gui_sender
@@ -99,7 +98,9 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
                 Connected(id, packet_receiver) => {
                     let mut radio_stream = UnboundedReceiverStream::from(packet_receiver);
 
-                    let merged_stream = radio_stream.merge(&subscriber_receiver);
+                    // TODO: Problem is they return two different types - so need to join in enum or
+                    // some alternative
+                    let merged_stream = radio_stream.merge(&mut subscriber_receiver);
 
                     // TODO receive either types of message: FromRadio or SubscriberMessage from the merged stream
                     // This is the code that works to handle the radio packets
@@ -148,7 +149,11 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
                     // Disconnect
                     let api = stream_api.take().unwrap();
                     device_state = Disconnected;
-                    let _ = do_disconnect(api, &gui_sender).await;
+                    let _ = do_disconnect(api).await;
+                    gui_sender
+                        .send(DisconnectedEvent(id.clone()))
+                        .await
+                        .unwrap_or_else(|e| eprintln!("Send error: {e}"));
                 }
             }
         }
@@ -164,19 +169,10 @@ async fn do_connect(id: &BleId) -> Result<(PacketReceiver, ConnectedStreamApi), 
     Ok((packet_receiver, stream_api))
 }
 
-async fn do_disconnect(
-    stream_api: ConnectedStreamApi,
-    id: &BleId,
-    gui_sender: &Sender<SubscriptionEvent>,
-) -> Result<(), anyhow::Error> {
+async fn do_disconnect(stream_api: ConnectedStreamApi) -> Result<(), anyhow::Error> {
     stream_api
         .disconnect()
         .await
         .context("Failed to disconnect")?;
-    gui_sender
-        .send(DisconnectedEvent(id.clone()))
-        .await
-        .unwrap_or_else(|e| eprintln!("Send error: {e}"));
-
     Ok(())
 }
