@@ -48,7 +48,7 @@ pub enum Message {
     Exit,
     NewConfig(Config),
     SaveConfig(Config),
-    AppError(String),
+    AppError(String, String),
     None,
 }
 
@@ -102,8 +102,8 @@ impl MeshChat {
                     Task::none()
                 }
             }
-            AppError(e) => {
-                eprintln!("{e}");
+            AppError(summary, detail) => {
+                eprintln!("{summary} {detail}");
                 Task::none()
             }
             Message::None => Task::none(),

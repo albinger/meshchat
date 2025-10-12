@@ -25,7 +25,8 @@ use tokio::sync::mpsc::Sender;
 
 #[derive(Clone)]
 pub enum ConnectionState {
-    Disconnected,
+    #[allow(dead_code)] // Remove this when the optional error string i sused
+    Disconnected(Option<String>),
     Connecting(String),
     Connected(String),
     Disconnecting(String),
@@ -69,7 +70,7 @@ async fn empty() {}
 impl DeviceView {
     pub fn new() -> Self {
         Self {
-            connection_state: Disconnected,
+            connection_state: Disconnected(None),
             subscription_sender: None,
             channels: vec![],
             nodes: vec![],
@@ -138,7 +139,7 @@ impl DeviceView {
                     }
                 }
                 DisconnectedEvent(_) => {
-                    self.connection_state = Disconnected;
+                    self.connection_state = Disconnected(None);
                     Task::perform(empty(), |_| Navigation(NavigationMessage::DevicesList))
                 }
                 Ready(sender) => {
@@ -201,9 +202,10 @@ impl DeviceView {
                     self.message = String::new();
                     Task::none()
                 }
-                ConnectionError(error, detail) => {
-                    eprintln!("Error: {} {}", error, detail);
-                    Task::perform(empty(), move |_| Message::AppError(error.clone()))
+                ConnectionError(summary, detail) => {
+                    eprintln!("Error: {} {}", summary, detail);
+                    self.connection_state = Disconnected(Some(summary.clone()));
+                    Task::perform(empty(), move |_| Message::AppError(summary.clone(), detail.clone()))
                 }
             },
             SendMessage => {
@@ -242,7 +244,7 @@ impl DeviceView {
             .push(text(" / "));
 
         header = match connection_state {
-            Disconnected => header.push(text("Disconnected")),
+            Disconnected(_) => header.push(text("Disconnected")),
             Connecting(name) => header.push(text(format!("Connecting to {}", name))),
             // TODO add navigation to device when viewing a channel
             Connected(name) => header.push(button(text(name))),

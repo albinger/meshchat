@@ -37,7 +37,7 @@ pub fn save_config(config: Config) -> Task<Message> {
         Task::perform(save(config_path, config), {
             |result| match result {
                 Ok(_) => Message::None,
-                Err(e) => Message::AppError(format!("Error saving config file: {e}")),
+                Err(e) => Message::AppError("Error saving config file".to_string(), e.to_string()),
             }
         })
     } else {
@@ -52,7 +52,7 @@ pub fn load_config() -> Task<Message> {
             Task::perform(load(config_path), {
                 |result| match result {
                     Ok(config) => Message::NewConfig(config),
-                    Err(e) => Message::AppError(format!("Error loading config file: {e}")),
+                    Err(e) => Message::AppError("Error loading config file".to_string(), e.to_string()),
                 }
             })
         } else {
@@ -60,7 +60,7 @@ pub fn load_config() -> Task<Message> {
             Task::perform(create(config_path), {
                 |result| match result {
                     Ok(_) => Message::None,
-                    Err(e) => Message::AppError(format!("Error creating config file: {e}")),
+                    Err(e) => Message::AppError("Error creating config file: ".to_string(), e.to_string()),
                 }
             })
         }

@@ -39,7 +39,8 @@ impl DeviceListView {
         header = header.push(button("Devices")).push(text(" / "));
 
         match connection_state {
-            Disconnected => header.push(text("Disconnected")),
+            // TODO maybe display an error against it if present
+            Disconnected(_) => header.push(text("Disconnected")),
             Connecting(name) => header.push(text(format!("Connecting to {}", name))),
             Connected(name) => {
                 let breadcrumb =
@@ -68,7 +69,8 @@ impl DeviceListView {
                         );
                     }
                 }
-                Disconnected => {
+                Disconnected(_) => {
+                    // TODO maybe show an error against it if present?
                     device_row = device_row.push(
                         button("Connect").on_press(Device(ConnectRequest(name_from_id(id), None))),
                     );
