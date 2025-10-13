@@ -58,8 +58,8 @@ impl DeviceListView {
 
     pub fn view(&self, connection_state: &ConnectionState) -> Element<'static, Message> {
         let mut main_col = Column::new();
-        // TODO make this a spinner in the view, or a bar back and fore - something visual
-        main_col = main_col.push(text("Scanning...Available devices:"));
+        // TODO make this bar moving back and fore at the top
+        main_col = main_col.push(text("Available devices:"));
 
         // TODO add a scrollable area in case there are a lot of devices
 
