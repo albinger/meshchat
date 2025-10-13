@@ -68,6 +68,12 @@ async fn request_disconnection(sender: Sender<SubscriberMessage>) {
 
 async fn empty() {}
 
+impl Default for DeviceView {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DeviceView {
     pub fn new() -> Self {
         Self {

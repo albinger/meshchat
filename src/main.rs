@@ -7,7 +7,7 @@ use crate::device_view::ConnectionState::Connected;
 use crate::device_view::{DeviceView, DeviceViewMessage};
 use crate::discovery::{ble_discovery, DiscoveryEvent};
 use crate::Message::{AppError, Device, Discovery, Exit, Navigation, NewConfig, WindowEvent};
-use iced::widget::{Column, Row};
+use iced::widget::{text, Column, Row};
 use iced::{window, Element, Event, Subscription, Task};
 use meshtastic::utils::stream::BleId;
 use std::cmp::PartialEq;
@@ -20,8 +20,9 @@ mod device_view;
 mod discovery;
 // mod router;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Default)]
 enum View {
+    #[default]
     DeviceList,
     Device,
 }
@@ -32,10 +33,12 @@ pub enum NavigationMessage {
     DeviceView,
 }
 
+#[derive(Default)]
 struct MeshChat {
     view: View,
     device_list_view: DeviceListView,
     device_view: DeviceView,
+    errors: Vec<(String, String)>,
 }
 
 /// These are the messages that MeshChat responds to
@@ -70,14 +73,7 @@ pub fn name_from_id(id: &BleId) -> String {
 
 impl MeshChat {
     fn new() -> (Self, Task<Message>) {
-        (
-            Self {
-                view: View::DeviceList, // Make the initial view the device list
-                device_list_view: DeviceListView::new(),
-                device_view: DeviceView::new(),
-            },
-            Task::batch(vec![load_config()]),
-        )
+        (Self::default(), Task::batch(vec![load_config()]))
     }
 
     fn title(&self) -> String {
@@ -132,15 +128,27 @@ impl MeshChat {
         let mut outer = Column::new();
 
         outer = outer.push(header);
+        outer = outer.push(self.errors());
         outer = outer.push(inner);
 
         outer.into()
     }
 
-    /// Subscribe to events from Discover and from Windows
+    fn errors(&self) -> Element<'_, Message> {
+        let mut errors = Row::new().padding(10);
+
+        // TODO a box with color and padding and a cancel button that removes this error
+        // larger font for summary, detail can be unfolded
+        for (summary, _details) in &self.errors {
+            errors = errors.push(text(summary.clone()));
+        }
+
+        errors.into()
+    }
+
+    /// Subscribe to events from Discover and from Windows and from Devices (Radios)
     fn subscription(&self) -> Subscription<Message> {
-        #[allow(unused_mut)]
-        let mut subscriptions = vec![
+        let subscriptions = vec![
             iced::event::listen().map(WindowEvent),
             Subscription::run(ble_discovery).map(Discovery),
             self.device_view.subscription().map(Device),

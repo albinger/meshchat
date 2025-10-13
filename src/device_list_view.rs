@@ -8,6 +8,7 @@ use iced::widget::{button, container, text, Column, Row};
 use iced::{Element, Length, Task};
 use meshtastic::utils::stream::BleId;
 
+#[derive(Default)]
 pub struct DeviceListView {
     devices: Vec<BleId>,
 }
@@ -15,12 +16,6 @@ pub struct DeviceListView {
 async fn empty() {}
 
 impl DeviceListView {
-    pub fn new() -> Self {
-        Self {
-            devices: Vec::new(),
-        }
-    }
-
     pub fn update(&mut self, discovery_event: DiscoveryEvent) -> Task<Message> {
         match discovery_event {
             DiscoveryEvent::BLERadioFound(id) => self.devices.push(id),
