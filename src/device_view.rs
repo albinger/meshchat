@@ -38,7 +38,7 @@ pub enum DeviceViewMessage {
     ConnectRequest(String, Option<i32>),
     DisconnectRequest(String),
     SubscriptionMessage(SubscriptionEvent),
-    ShowChannel(i32),
+    ShowChannel(Option<i32>),
     MessageInput(String),
     SendMessage,
 }
@@ -114,11 +114,11 @@ impl DeviceView {
             ShowChannel(channel_number) => {
                 if let Connected(name) = &self.connection_state {
                     let device_name = Some(name.clone());
-                    self.channel_number = Some(channel_number);
+                    self.channel_number = channel_number;
                     Task::perform(empty(), move |_| {
                         Message::SaveConfig(Config {
                             device_name: device_name.clone(),
-                            channel_number: Some(channel_number),
+                            channel_number,
                         })
                     })
                 } else {
@@ -141,7 +141,7 @@ impl DeviceView {
                             })
                         }
                         Some(channel_number) => Task::perform(empty(), move |_| {
-                            Message::Device(ShowChannel(channel_number))
+                            Message::Device(ShowChannel(Some(channel_number)))
                         }),
                     }
                 }
@@ -247,7 +247,7 @@ impl DeviceView {
         connection_state: &'a ConnectionState,
     ) -> Row<'a, Message> {
         header = header
-            .push(button("Devices").on_press(Navigation(NavigationMessage::DevicesList)))
+            .push(button("Devices").on_press(Navigation(DevicesList)))
             .push(text(" / "));
 
         header = match connection_state {
@@ -255,9 +255,7 @@ impl DeviceView {
             Connecting(name) => header.push(text(format!("Connecting to {}", name))),
             Connected(name) => {
                 if self.channel_number.is_some() {
-                    header.push(
-                        button(text(name)).on_press(Navigation(NavigationMessage::DeviceView)),
-                    )
+                    header.push(button(text(name)).on_press(Message::Device(ShowChannel(None))))
                 } else {
                     header.push(button(text(name)))
                 }
@@ -349,8 +347,8 @@ impl DeviceView {
         let name = Self::channel_name(channel);
         channel_row = channel_row.push(text(name).shaping(text::Shaping::Advanced));
         channel_row = channel_row.push(text(format!(" ({})", packets.len())));
-        channel_row =
-            channel_row.push(button(" Chat").on_press(Message::Device(ShowChannel(channel.index))));
+        channel_row = channel_row
+            .push(button(" Chat").on_press(Message::Device(ShowChannel(Some(channel.index)))));
 
         channel_row
     }
