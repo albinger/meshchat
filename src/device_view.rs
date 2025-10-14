@@ -1,4 +1,4 @@
-use crate::channel_view::channel_view;
+use crate::channel_view::{ChannelView, ChannelViewMessage};
 use crate::config::Config;
 use crate::device_subscription::SubscriberMessage::{Connect, Disconnect, SendText};
 use crate::device_subscription::SubscriptionEvent::{
@@ -7,7 +7,7 @@ use crate::device_subscription::SubscriptionEvent::{
 use crate::device_subscription::{SubscriberMessage, SubscriptionEvent};
 use crate::device_view::ConnectionState::{Connected, Connecting, Disconnected, Disconnecting};
 use crate::device_view::DeviceViewMessage::{
-    ConnectRequest, DisconnectRequest, MessageInput, SendMessage, ShowChannel, SubscriptionMessage,
+    ChannelMsg, ConnectRequest, DisconnectRequest, SendMessage, ShowChannel, SubscriptionMessage,
 };
 use crate::Message::Navigation;
 use crate::NavigationMessage::DevicesList;
@@ -20,7 +20,7 @@ use iced_futures::Subscription;
 use meshtastic::protobufs::channel::Role;
 use meshtastic::protobufs::channel::Role::*;
 use meshtastic::protobufs::from_radio::PayloadVariant;
-use meshtastic::protobufs::{Channel, MeshPacket, NodeInfo};
+use meshtastic::protobufs::{Channel, NodeInfo};
 use meshtastic::utils::stream::BleId;
 use tokio::sync::mpsc::Sender;
 
@@ -39,18 +39,18 @@ pub enum DeviceViewMessage {
     DisconnectRequest(String),
     SubscriptionMessage(SubscriptionEvent),
     ShowChannel(Option<i32>),
-    MessageInput(String),
-    SendMessage,
+    ChannelMsg(ChannelViewMessage),
+    SendMessage(String, i32),
 }
 
 pub struct DeviceView {
     connection_state: ConnectionState,
     subscription_sender: Option<Sender<SubscriberMessage>>, // TODO Maybe combine with Disconnected state?
     my_node_num: Option<u32>,
-    pub(crate) channels: Vec<(Channel, Vec<MeshPacket>)>, // Upto 8 - but maybe depends on firmware
-    nodes: Vec<NodeInfo>,                                 // all nodes known to the connected radio
-    pub(crate) channel_number: Option<i32>,               // Channel numbers from 0 to 7
-    pub message: String,                                  // Message typed in so far
+    pub(crate) channels: Vec<Channel>, // Upto 8 - but maybe depends on firmware
+    nodes: Vec<NodeInfo>,              // all nodes known to the connected radio
+    pub(crate) channel_number: Option<i32>, // Channel numbers from 0 to 7
+    channel_views: Vec<ChannelView>,
 }
 
 async fn request_connection(sender: Sender<SubscriberMessage>, name: String) {
@@ -83,7 +83,7 @@ impl DeviceView {
             nodes: vec![],
             my_node_num: None,
             channel_number: None, // No channel is being shown by default
-            message: String::new(),
+            channel_views: vec![],
         }
     }
 
@@ -162,10 +162,10 @@ impl DeviceView {
                 DevicePacket(packet) => {
                     match packet.payload_variant.unwrap() {
                         PayloadVariant::Packet(mesh_packet) => {
-                            if let Some((_, packets)) =
-                                &mut self.channels.get_mut(mesh_packet.channel as usize)
+                            if let Some(channel_view) =
+                                &mut self.channel_views.get_mut(mesh_packet.channel as usize)
                             {
-                                packets.push(mesh_packet);
+                                channel_view.push_packet(mesh_packet);
                             }
                         }
                         PayloadVariant::MyInfo(my_node_info) => {
@@ -188,7 +188,9 @@ impl DeviceView {
                                 if settings.name.is_empty() {
                                     settings.name = "Default".to_string();
                                 };
-                                self.channels.push((channel, vec![]))
+                                self.channels.push(channel);
+                                self.channel_views
+                                    .push(ChannelView::new((self.channels.len() - 1) as i32));
                             }
                         }
                         PayloadVariant::QueueStatus(_) => {
@@ -209,10 +211,10 @@ impl DeviceView {
                     }
                     Task::none()
                 }
-                MessageSent => {
-                    // TODO Mark as sent in the UI, and clear the message entry
-                    // Until we have some kind of queue of messages being sent pending confirmation
-                    self.message = String::new();
+                MessageSent(channel_index) => {
+                    if let Some(channel_view) = self.channel_views.get_mut(channel_index as usize) {
+                        channel_view.message_sent();
+                    }
                     Task::none()
                 }
                 ConnectionError(id, summary, detail) => {
@@ -221,28 +223,23 @@ impl DeviceView {
                         .chain(Self::report_error(summary.clone(), detail.clone()))
                 }
             },
-            SendMessage => {
+            SendMessage(message, index) => {
+                let sender = self.subscription_sender.clone();
+                Task::perform(request_send(sender.unwrap(), message, index), |_| {
+                    Message::None
+                })
+            }
+            ChannelMsg(msg) => {
                 if let Some(channel_number) = self.channel_number {
-                    // TODO Add to messages in the channel for display, or wait for packet back from radio
-                    // as a confirmation? Maybe add as sending status?
-                    // Display it just above the text input until confirmed by arriving in channel?
-                    // for now only sent to the subscription
-                    let sender = self.subscription_sender.clone();
-                    // TODO add an id to the message, or get it back from the subscription to be
-                    // able to handle replies to it later. Get a timestamp and maybe sender id
-                    // when TextSent then add to the UI list of messages, interleaved with
-                    // those received using the timestamp
-                    Task::perform(
-                        request_send(sender.unwrap(), self.message.clone(), channel_number),
-                        |_| Message::None,
-                    )
+                    if let Some(channel_view) = self.channel_views.get_mut(channel_number as usize)
+                    {
+                        channel_view.update(msg)
+                    } else {
+                        Task::none()
+                    }
                 } else {
                     Task::none()
                 }
-            }
-            MessageInput(s) => {
-                self.message = s;
-                Task::none()
             }
         }
     }
@@ -270,7 +267,7 @@ impl DeviceView {
         };
 
         if let Some(channel_number) = self.channel_number {
-            if let Some((channel, _packets)) = &self.channels.get(channel_number as usize) {
+            if let Some(channel) = &self.channels.get(channel_number as usize) {
                 let channel_name = Self::channel_name(channel);
                 header.push(text(" / ")).push(button(text(channel_name)))
             } else {
@@ -282,23 +279,28 @@ impl DeviceView {
     }
 
     pub fn view(&self) -> Element<'static, Message> {
-        if let Some(channel_number) = self.channel_number
-            && let Some((_channel, packets)) = &self.channels.get(channel_number as usize)
-        {
-            channel_view(self, packets)
-        } else {
-            self.device_view()
+        if let Some(channel_number) = self.channel_number {
+            // && let Some((_channel, packets)) = &self.channels.get(channel_number as usize)
+            if let Some(channel_view) = self.channel_views.get(channel_number as usize) {
+                return channel_view.view();
+            }
         }
+
+        self.device_view()
     }
 
     fn device_view(&self) -> Element<'static, Message> {
         let mut channels_view = Column::new();
-        for (channel, packets) in &self.channels {
+        for (index, channel) in self.channels.iter().enumerate() {
             // TODO show QR of the channel config
             let channel_row = match Role::try_from(channel.role).unwrap() {
                 Disabled => break,
-                Primary => Self::channel_row(true, channel, packets),
-                Secondary => Self::channel_row(false, channel, packets),
+                Primary => {
+                    Self::channel_row(true, channel, self.channel_views[index].num_packets())
+                }
+                Secondary => {
+                    Self::channel_row(false, channel, self.channel_views[index].num_packets())
+                }
             };
             channels_view = channels_view.push(channel_row);
         }
@@ -338,11 +340,7 @@ impl DeviceView {
         settings.name.clone()
     }
 
-    fn channel_row(
-        primary: bool,
-        channel: &Channel,
-        packets: &[MeshPacket],
-    ) -> Row<'static, Message> {
+    fn channel_row(primary: bool, channel: &Channel, num_packets: usize) -> Row<'static, Message> {
         let mut channel_row = Row::new();
         if primary {
             channel_row = channel_row.push(text("Channel: Primary: "))
@@ -352,7 +350,7 @@ impl DeviceView {
 
         let name = Self::channel_name(channel);
         channel_row = channel_row.push(text(name).shaping(text::Shaping::Advanced));
-        channel_row = channel_row.push(text(format!(" ({})", packets.len())));
+        channel_row = channel_row.push(text(format!(" ({})", num_packets)));
         channel_row = channel_row
             .push(button(" Chat").on_press(Message::Device(ShowChannel(Some(channel.index)))));
 

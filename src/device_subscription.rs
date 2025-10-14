@@ -28,7 +28,7 @@ pub enum SubscriptionEvent {
     ConnectedEvent(BleId),
     DisconnectedEvent(BleId),
     DevicePacket(Box<FromRadio>),
-    MessageSent, // Maybe add type for when we send emojis or something else
+    MessageSent(i32), // Maybe add type for when we send emojis or something else
     ConnectionError(BleId, String, String),
 }
 
@@ -109,8 +109,8 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
                         match message {
                             Connect(_) => eprintln!("Already connected!"),
                             Disconnect => break,
-                            SendText(text, channel_number) => {
-                                println!("SendText '{text}' to channel: {channel_number}");
+                            SendText(text, channel_index) => {
+                                println!("SendText '{text}' to channel: {channel_index}");
                                 // TODO handle send errors and report to UI
                                 let api = stream_api.take().unwrap();
                                 /*
@@ -125,7 +125,7 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
                                     .await;
                                  */
                                 gui_sender
-                                    .send(MessageSent)
+                                    .send(MessageSent(channel_index))
                                     .await
                                     .unwrap_or_else(|e| eprintln!("Send error: {e}"));
 
