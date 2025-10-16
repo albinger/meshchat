@@ -3,6 +3,7 @@ use crate::device_subscription::SubscriberMessage::{Connect, Disconnect, Radio, 
 use crate::device_subscription::SubscriptionEvent::{
     ConnectedEvent, ConnectionError, DevicePacket, DisconnectedEvent, MessageSent,
 };
+use crate::name_from_id;
 use anyhow::Context;
 use futures::SinkExt;
 use iced::stream;
@@ -88,7 +89,7 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
                                 gui_sender
                                     .send(ConnectionError(
                                         id.clone(),
-                                        format!("Failed to connect to '{id}'"),
+                                        format!("Failed to connect to {}", name_from_id(&id)),
                                         e.to_string(),
                                     ))
                                     .await

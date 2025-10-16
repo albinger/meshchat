@@ -1,40 +1,119 @@
-use crate::channel_view::ChannelViewMessage::MessageInput;
+use crate::channel_view::ChannelViewMessage::{ClearMessage, MessageInput};
 use crate::device_view::DeviceViewMessage::{ChannelMsg, SendMessage};
 use crate::Message;
+use iced::border::Radius;
+use iced::widget::container::Style;
 use iced::widget::scrollable::Scrollbar;
-use iced::widget::{scrollable, text, text_input, Column, Row};
-use iced::{Element, Fill, Task};
+use iced::widget::{scrollable, text, text_input, Column, Container, Row, Space};
+use iced::{Background, Border, Color, Element, Fill, Left, Right, Shadow, Task, Theme};
 use meshtastic::protobufs::mesh_packet::PayloadVariant::Decoded;
 use meshtastic::protobufs::{MeshPacket, PortNum};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+const RADIUS_12: Radius = Radius {
+    top_left: 12.0,
+    top_right: 12.0,
+    bottom_right: 12.0,
+    bottom_left: 12.0,
+};
+
+const MESSAGE_BORDER: Border = Border {
+    radius: RADIUS_12, // rounded corners
+    width: 2.0,
+    color: Color::WHITE,
+};
+
+const NO_SHADOW: Shadow = Shadow {
+    color: Color::TRANSPARENT,
+    offset: iced::Vector { x: 0.0, y: 0.0 },
+    blur_radius: 0.0,
+};
+
+const MY_STYLE: Style = Style {
+    text_color: Some(Color::WHITE),
+    background: Some(Background::Color(Color::from_rgba(0.08, 0.3, 0.22, 1.0))),
+    border: MESSAGE_BORDER,
+    shadow: NO_SHADOW,
+};
+
+const OTHERS_STYLE: Style = Style {
+    text_color: Some(Color::WHITE),
+    background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 1.0))),
+    border: MESSAGE_BORDER,
+    shadow: NO_SHADOW,
+};
 
 #[derive(Debug, Clone)]
 pub enum ChannelViewMessage {
     MessageInput(String),
+    ClearMessage,
+}
+
+struct ChannelMessage {
+    from: u32,
+    to: u32,
+    rx_time: u32,
+    text: String,
 }
 
 pub struct ChannelView {
     pub(crate) channel_index: i32, // Channel number of the channel we are chatting on
     pub packets: Vec<MeshPacket>,
-    pub message: String, // Message typed in so far
+    message: String, // Message typed in so far
+    messages: Vec<ChannelMessage>,
+    my_source: u32,
 }
 
 impl ChannelView {
-    pub fn new(channel_index: i32) -> Self {
+    pub fn new(channel_index: i32, source: u32) -> Self {
         Self {
             channel_index,
             packets: Vec::new(),
             message: String::new(),
+            messages: vec![],
+            my_source: source,
         }
     }
 
     pub fn message_sent(&mut self) {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|t| t.as_secs())
+            .unwrap_or(0);
+
         // TODO Mark as sent in the UI, and clear the message entry
+        self.messages.push(ChannelMessage {
+            text: self.message.clone(),
+            from: self.my_source,
+            to: self.my_source,  // TODO figure out this?
+            rx_time: now as u32, // time in epoc
+        });
         // Until we have some kind of queue of messages being sent pending confirmation
         self.message = String::new();
     }
 
     pub fn push_packet(&mut self, mesh_packet: MeshPacket) {
-        self.packets.push(mesh_packet);
+        if let Some(Decoded(data)) = &mesh_packet.payload_variant
+            && data.emoji == 0
+        // TODO handle emoji replies
+        {
+            match PortNum::try_from(data.portnum) {
+                Ok(PortNum::TextMessageApp) => {
+                    self.messages.push(ChannelMessage {
+                        text: String::from_utf8(data.payload.clone()).unwrap(),
+                        from: mesh_packet.from,
+                        to: mesh_packet.to,
+                        rx_time: mesh_packet.rx_time,
+                    });
+                }
+                Ok(PortNum::PositionApp) => println!("Position payload"),
+                Ok(PortNum::AlertApp) => println!("Alert payload"),
+                Ok(PortNum::TelemetryApp) => println!("Telemetry payload"),
+                Ok(PortNum::NeighborinfoApp) => println!("Neighbor Info payload"),
+                Ok(PortNum::NodeinfoApp) => println!("Node Info payload"),
+                _ => eprintln!("Unexpected payload type from radio: {}", data.portnum),
+            }
+        }
     }
 
     pub fn num_packets(&self) -> usize {
@@ -47,6 +126,10 @@ impl ChannelView {
                 self.message = s;
                 Task::none()
             }
+            ClearMessage => {
+                self.message = String::new();
+                Task::none()
+            }
         }
     }
 
@@ -54,28 +137,11 @@ impl ChannelView {
     pub fn view(&self) -> Element<'static, Message> {
         let mut channel_view = Column::new();
 
-        for packet in &self.packets {
-            if let Some(Decoded(data)) = &packet.payload_variant
-                && data.emoji == 0
-            // TODO handle emoji replies
-            {
-                match PortNum::try_from(data.portnum) {
-                    Ok(PortNum::TextMessageApp) => {
-                        let mut packet_row = Row::new();
-                        packet_row = packet_row.push(
-                            text(String::from_utf8(data.payload.clone()).unwrap())
-                                .shaping(text::Shaping::Advanced),
-                        );
-                        channel_view = channel_view.push(packet_row);
-                    }
-                    Ok(PortNum::PositionApp) => println!("Position payload"),
-                    Ok(PortNum::AlertApp) => println!("Alert payload"),
-                    Ok(PortNum::TelemetryApp) => println!("Telemetry payload"),
-                    Ok(PortNum::NeighborinfoApp) => println!("Neighbor Info payload"),
-                    Ok(PortNum::NodeinfoApp) => println!("Node Info payload"),
-                    _ => eprintln!("Unexpected payload type from radio: {}", data.portnum),
-                }
-            }
+        for message in &self.messages {
+            channel_view = channel_view.push(message_box(
+                message.text.clone(),
+                message.from == self.my_source,
+            ));
         }
 
         let channel_scroll = scrollable(channel_view)
@@ -86,23 +152,76 @@ impl ChannelView {
             .width(Fill)
             .height(Fill);
 
-        // TODO set an icon,
-        // TODO Add to messages in the channel for display, or wait for packet back from radio
-        // as a confirmation? Maybe add as sending status?
-        // Display it just above the text input until confirmed by arriving in channel?
-        // for now only sent to the subscription
-        // TODO add an id to the message, or get it back from the subscription to be
-        // able to handle replies to it later. Get a timestamp and maybe sender id
-        // when TextSent then add to the UI list of messages, interleaved with
-        // those received using the timestamp
-        let text_box = text_input("Message>", &self.message)
+        Column::new()
+            .padding(4)
+            .push(channel_scroll)
+            .push(self.input_box())
+            .into()
+    }
+
+    // TODO set an icon,
+    // TODO Add to messages in the channel for display, or wait for packet back from radio
+    // as a confirmation? Maybe add as sending status?
+    // Display it just above the text input until confirmed by arriving in channel?
+    // for now only sent to the subscription
+    // TODO add an id to the message, or get it back from the subscription to be
+    // able to handle replies to it later. Get a timestamp and maybe sender id
+    // when TextSent then add to the UI list of messages, interleaved with
+    // those received using the timestamp
+    // TODO add an icon for sending a message
+    // TODO add a method (button?) to clear the text and maybe keyboard short cuts
+
+    fn input_box(&self) -> Element<'static, Message> {
+        let text_box = text_input("Send Message", &self.message)
+            .style(
+                |_theme: &Theme, _status: text_input::Status| text_input::Style {
+                    background: Background::Color(Default::default()),
+                    border: Default::default(),
+                    icon: Color::WHITE,
+                    placeholder: Color::from_rgb8(0x80, 0x80, 0x80),
+                    value: Color::WHITE,
+                    selection: Default::default(),
+                },
+            )
             .on_input(|s| Message::Device(ChannelMsg(MessageInput(s))))
             .on_submit(Message::Device(SendMessage(
                 self.message.clone(),
                 self.channel_index,
             )));
-        let bottom_row = Row::new().push(text_box);
 
-        Column::new().push(channel_scroll).push(bottom_row).into()
+        let container = Container::new(text_box)
+            .padding([2, 2]) // adjust to taste
+            .style(|_theme: &Theme| Style {
+                text_color: Some(Color::WHITE),
+                background: Some(Background::Color(Color::from_rgb8(0x40, 0x40, 0x40))),
+                border: Border {
+                    radius: Radius::from(12.0), // rounded corners
+                    width: 0.0,
+                    color: Color::WHITE,
+                },
+                ..Default::default()
+            });
+
+        let row = Row::new().padding([6, 6]);
+        row.push(container).into()
+    }
+}
+
+fn message_box(msg: String, me: bool) -> Element<'static, Message> {
+    let style = if me { MY_STYLE } else { OTHERS_STYLE };
+
+    let bubble = Container::new(iced::widget::text(msg).shaping(text::Shaping::Advanced))
+        .padding([6, 12]) // adjust to taste
+        .style(move |_theme: &Theme| style);
+
+    let mut row = Row::new().padding([6, 6]);
+    if me {
+        row = row.push(Space::new(100.0, 1.0)).push(bubble);
+        let col = Column::new().align_x(Right);
+        col.push(row).into()
+    } else {
+        row = row.push(bubble).push(Space::new(100.0, 1.0));
+        let col = Column::new().align_x(Left);
+        col.push(row).into()
     }
 }

@@ -9,7 +9,7 @@ use crate::device_view::ConnectionState::{Connected, Connecting, Disconnected, D
 use crate::device_view::DeviceViewMessage::{
     ChannelMsg, ConnectRequest, DisconnectRequest, SendMessage, ShowChannel, SubscriptionMessage,
 };
-use crate::Message::{AppError, Navigation};
+use crate::Message::Navigation;
 use crate::NavigationMessage::DevicesList;
 use crate::{device_subscription, name_from_id, Message, NavigationMessage};
 use iced::widget::scrollable::Scrollbar;
@@ -156,9 +156,7 @@ impl DeviceView {
                 }
                 Ready(sender) => {
                     self.subscription_sender = Some(sender);
-                    Task::perform(empty(), |_| {
-                        AppError("subscriber ready".to_string(), "ready".to_string())
-                    })
+                    Task::none()
                 }
                 DevicePacket(packet) => {
                     match packet.payload_variant.unwrap() {
@@ -185,8 +183,10 @@ impl DeviceView {
                                     settings.name = "Default".to_string();
                                 };
                                 self.channels.push(channel);
-                                self.channel_views
-                                    .push(ChannelView::new((self.channels.len() - 1) as i32));
+                                self.channel_views.push(ChannelView::new(
+                                    (self.channels.len() - 1) as i32,
+                                    self.my_node_num.unwrap(),
+                                ));
                             }
                         }
                         PayloadVariant::QueueStatus(_) => {
