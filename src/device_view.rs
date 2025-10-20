@@ -287,12 +287,7 @@ impl DeviceView {
             // TODO show QR of the channel config
             let channel_row = match Role::try_from(channel.role).unwrap() {
                 Disabled => break,
-                Primary => {
-                    Self::channel_row(true, channel, self.channel_views[index].num_packets())
-                }
-                Secondary => {
-                    Self::channel_row(false, channel, self.channel_views[index].num_packets())
-                }
+                _ => Self::channel_row(channel, self.channel_views[index].num_packets()),
             };
             channels_view = channels_view.push(channel_row);
         }
@@ -326,27 +321,20 @@ impl DeviceView {
     }
 
     fn channel_name(channel: &Channel) -> String {
-        let settings = channel.settings.as_ref();
-        // TODO handle errors
-        let settings = &settings.unwrap();
-        settings.name.clone()
+        channel
+            .settings
+            .as_ref()
+            .map(|s| s.name.clone())
+            .unwrap_or("Unknown".to_string())
     }
 
-    fn channel_row(primary: bool, channel: &Channel, num_packets: usize) -> Row<'static, Message> {
+    fn channel_row(channel: &Channel, num_packets: usize) -> Row<'static, Message> {
         let mut channel_row = Row::new();
-        if primary {
-            channel_row = channel_row.push(text("Channel: Primary: "))
-        } else {
-            channel_row = channel_row.push(text("Channel Secondary "))
-        }
-
         let name = Self::channel_name(channel);
         channel_row = channel_row.push(text(name).shaping(text::Shaping::Advanced));
         channel_row = channel_row.push(text(format!(" ({})", num_packets)));
-        channel_row = channel_row
-            .push(button(" Chat").on_press(Message::Device(ShowChannel(Some(channel.index)))));
-
         channel_row
+            .push(button(" Chat").on_press(Message::Device(ShowChannel(Some(channel.index)))))
     }
 
     /// Create subscriptions for events coming from a connected hardware device (radio)
