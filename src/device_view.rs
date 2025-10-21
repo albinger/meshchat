@@ -7,7 +7,8 @@ use crate::device_subscription::SubscriptionEvent::{
 use crate::device_subscription::{SubscriberMessage, SubscriptionEvent};
 use crate::device_view::ConnectionState::{Connected, Connecting, Disconnected, Disconnecting};
 use crate::device_view::DeviceViewMessage::{
-    ChannelMsg, ConnectRequest, DisconnectRequest, SendMessage, ShowChannel, SubscriptionMessage,
+    ChannelMsg, ConnectRequest, DisconnectRequest, SearchInput, SendMessage, ShowChannel,
+    SubscriptionMessage,
 };
 use crate::Message::Navigation;
 use crate::NavigationMessage::DevicesList;
@@ -16,7 +17,7 @@ use iced::border::Radius;
 use iced::widget::button::Status::Hovered;
 use iced::widget::button::{Status, Style};
 use iced::widget::scrollable::Scrollbar;
-use iced::widget::{button, scrollable, text, Button, Column, Row};
+use iced::widget::{button, scrollable, text, text_input, Button, Column, Container, Row};
 use iced::{Background, Border, Color, Element, Shadow, Task, Theme};
 use iced_futures::core::Length::Fill;
 use iced_futures::Subscription;
@@ -26,6 +27,45 @@ use meshtastic::protobufs::from_radio::PayloadVariant;
 use meshtastic::protobufs::{Channel, NodeInfo};
 use meshtastic::utils::stream::BleId;
 use tokio::sync::mpsc::Sender;
+
+const RADIUS_2: Radius = Radius {
+    top_left: 2.0,
+    top_right: 2.0,
+    bottom_right: 2.0,
+    bottom_left: 2.0,
+};
+
+const NO_SHADOW: Shadow = Shadow {
+    color: Color::TRANSPARENT,
+    offset: iced::Vector { x: 0.0, y: 0.0 },
+    blur_radius: 0.0,
+};
+
+const WHITE_BORDER: Border = Border {
+    color: Color::WHITE,
+    width: 2.0,
+    radius: RADIUS_2,
+};
+
+const NO_BORDER: Border = Border {
+    color: Color::TRANSPARENT,
+    width: 0.0,
+    radius: RADIUS_2,
+};
+
+const VIEW_BUTTON_HOVER_STYLE: Style = Style {
+    background: Some(Background::Color(Color::from_rgba(0.0, 0.8, 0.8, 1.0))),
+    text_color: Color::BLACK,
+    border: WHITE_BORDER,
+    shadow: NO_SHADOW,
+};
+
+const VIEW_BUTTON_STYLE: Style = Style {
+    background: Some(Background::Color(Color::from_rgba(0.0, 1.0, 1.0, 0.0))),
+    text_color: Color::WHITE,
+    border: NO_BORDER,
+    shadow: NO_SHADOW,
+};
 
 #[derive(Clone)]
 pub enum ConnectionState {
@@ -44,6 +84,7 @@ pub enum DeviceViewMessage {
     ShowChannel(Option<i32>),
     ChannelMsg(ChannelViewMessage),
     SendMessage(String, i32),
+    SearchInput(String),
 }
 
 pub struct DeviceView {
@@ -54,6 +95,7 @@ pub struct DeviceView {
     nodes: Vec<NodeInfo>,              // all nodes known to the connected radio
     pub(crate) channel_number: Option<i32>, // Channel numbers from 0 to 7
     channel_views: Vec<ChannelView>,
+    filter: String,
 }
 
 async fn request_connection(sender: Sender<SubscriberMessage>, name: String) {
@@ -87,6 +129,7 @@ impl DeviceView {
             my_node_num: None,
             channel_number: None, // No channel is being shown by default
             channel_views: vec![],
+            filter: String::default(),
         }
     }
 
@@ -164,6 +207,8 @@ impl DeviceView {
                 DevicePacket(packet) => {
                     match packet.payload_variant.unwrap() {
                         PayloadVariant::Packet(mesh_packet) => {
+                            // TODO determine if there is a packet for this node or user, and
+                            // not a channel? Then send to node view?
                             if let Some(channel_view) =
                                 &mut self.channel_views.get_mut(mesh_packet.channel as usize)
                             {
@@ -236,6 +281,10 @@ impl DeviceView {
                     Task::none()
                 }
             }
+            SearchInput(filter) => {
+                self.filter = filter;
+                Task::none()
+            }
         }
     }
 
@@ -286,11 +335,22 @@ impl DeviceView {
 
     fn device_view(&self) -> Element<'static, Message> {
         let mut channels_view = Column::new();
+
+        // Search box at the top
+
         for (index, channel) in self.channels.iter().enumerate() {
             // TODO show QR of the channel config
+            let channel_name = Self::channel_name(channel);
+
+            if !self.filter.is_empty() && !channel_name.contains(&self.filter) {
+                continue;
+            }
+
             let channel_row = match Role::try_from(channel.role).unwrap() {
                 Disabled => break,
-                _ => Self::channel_row(channel, self.channel_views[index].num_packets()),
+                _ => {
+                    Self::channel_row(channel_name, self.channel_views[index].num_packets(), index)
+                }
             };
             channels_view = channels_view.push(channel_row);
         }
@@ -299,12 +359,7 @@ impl DeviceView {
             if !node.is_ignored
                 && let Some(user) = &node.user
             {
-                let mut node_row = Row::new();
-                node_row = node_row.push(
-                    text(format!("User: {}", user.long_name.clone()))
-                        .shaping(text::Shaping::Advanced),
-                );
-                channels_view = channels_view.push(node_row);
+                channels_view = channels_view.push(Self::node_row(user.long_name.clone()));
                 // TODO can add to nodes on the channel list above if channel is "populated" (not 0?)
                 // TODO mark as a favourite if has is_favorite set
             }
@@ -318,8 +373,10 @@ impl DeviceView {
             .width(Fill)
             .height(Fill);
 
-        let mut main_col = Column::new();
-        main_col = main_col.push(channel_and_user_scroll);
+        let mut main_col = Column::new().padding(12);
+        main_col = main_col
+            .push(self.search_box())
+            .push(channel_and_user_scroll);
         main_col.into()
     }
 
@@ -331,59 +388,58 @@ impl DeviceView {
             .unwrap_or("Unknown".to_string())
     }
 
-    const RADIUS_2: Radius = Radius {
-        top_left: 2.0,
-        top_right: 2.0,
-        bottom_right: 2.0,
-        bottom_left: 2.0,
-    };
-
-    pub(crate) const NO_SHADOW: Shadow = Shadow {
-        color: Color::TRANSPARENT,
-        offset: iced::Vector { x: 0.0, y: 0.0 },
-        blur_radius: 0.0,
-    };
-
-    pub(crate) const WHITE_BORDER: Border = Border {
-        color: Color::WHITE,
-        width: 2.0,
-        radius: Self::RADIUS_2,
-    };
-
-    pub(crate) const NO_BORDER: Border = Border {
-        color: Color::TRANSPARENT,
-        width: 0.0,
-        radius: Self::RADIUS_2,
-    };
-
-    const VIEW_BUTTON_HOVER_STYLE: Style = Style {
-        background: Some(Background::Color(Color::from_rgba(0.0, 0.8, 0.8, 1.0))),
-        text_color: Color::BLACK,
-        border: Self::WHITE_BORDER,
-        shadow: Self::NO_SHADOW,
-    };
-
-    const VIEW_BUTTON_STYLE: Style = Style {
-        background: Some(Background::Color(Color::from_rgba(0.0, 1.0, 1.0, 0.0))),
-        text_color: Color::WHITE,
-        border: Self::NO_BORDER,
-        shadow: Self::NO_SHADOW,
-    };
-
     fn view_button(_: &Theme, status: Status) -> Style {
         if status == Hovered {
-            Self::VIEW_BUTTON_HOVER_STYLE
+            VIEW_BUTTON_HOVER_STYLE
         } else {
-            Self::VIEW_BUTTON_STYLE
+            VIEW_BUTTON_STYLE
         }
     }
 
-    fn channel_row(channel: &Channel, num_packets: usize) -> Button<'static, Message> {
-        let row_text = format!("{} ({})", Self::channel_name(channel), num_packets);
+    fn channel_row(name: String, num_packets: usize, index: usize) -> Button<'static, Message> {
+        let row_text = format!("{} ({})", name, num_packets);
         button(text(row_text))
-            .on_press(Message::Device(ShowChannel(Some(channel.index))))
+            .on_press(Message::Device(ShowChannel(Some(index as i32))))
             .width(Fill)
             .style(Self::view_button)
+    }
+
+    fn node_row(name: String) -> Button<'static, Message> {
+        button(text(name).shaping(text::Shaping::Advanced))
+            .width(Fill)
+            .style(Self::view_button)
+    }
+
+    fn search_box(&self) -> Element<'static, Message> {
+        // TODO move styles to constants
+        let search_box = text_input("Search", &self.filter)
+            .style(
+                |_theme: &Theme, _status: text_input::Status| text_input::Style {
+                    background: Background::Color(Default::default()),
+                    border: Default::default(),
+                    icon: Color::WHITE,
+                    placeholder: Color::from_rgb8(0x80, 0x80, 0x80),
+                    value: Color::WHITE,
+                    selection: Default::default(),
+                },
+            )
+            .on_input(|s| Message::Device(SearchInput(s)));
+
+        let container = Container::new(search_box)
+            .padding([2, 2]) // adjust to taste
+            .style(|_theme: &Theme| iced::widget::container::Style {
+                text_color: Some(Color::WHITE),
+                background: Some(Background::Color(Color::from_rgb8(0x40, 0x40, 0x40))),
+                border: Border {
+                    radius: Radius::from(12.0), // rounded corners
+                    width: 0.0,
+                    color: Color::WHITE,
+                },
+                ..Default::default()
+            });
+
+        let row = Row::new().padding([6, 6]);
+        row.push(container).into()
     }
 
     /// Create subscriptions for events coming from a connected hardware device (radio)

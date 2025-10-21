@@ -196,6 +196,8 @@ impl ChannelView {
     // TODO add a method (button?) to clear the text and maybe keyboard short cuts
 
     fn input_box(&self) -> Element<'static, Message> {
+        // TODO move styles to constants
+
         let text_box = text_input("Send Message", &self.message)
             .style(
                 |_theme: &Theme, _status: text_input::Status| text_input::Style {
