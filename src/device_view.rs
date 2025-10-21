@@ -341,6 +341,7 @@ impl DeviceView {
             // TODO show QR of the channel config
             let channel_name = Self::channel_name(channel);
 
+            // If there is a filter and the channel name does not contain it, don't show this row
             if !self.filter.is_empty() && !channel_name.contains(&self.filter) {
                 continue;
             }
@@ -358,6 +359,11 @@ impl DeviceView {
             if !node.is_ignored
                 && let Some(user) = &node.user
             {
+                // If there is a filter and the Username does not contain it, don't show this row
+                if !self.filter.is_empty() && !user.long_name.contains(&self.filter) {
+                    continue;
+                }
+
                 channels_view = channels_view.push(Self::node_row(user.long_name.clone()));
                 // TODO can add to nodes on the channel list above if channel is "populated" (not 0?)
                 // TODO mark as a favourite if has is_favorite set
