@@ -10,16 +10,15 @@ use crate::device_view::DeviceViewMessage::{
     ChannelMsg, ConnectRequest, DisconnectRequest, SearchInput, SendMessage, ShowChannel,
     SubscriptionMessage,
 };
-use crate::styles::{TEXT_INPUT_BACKGROUND, TEXT_INPUT_BORDER, TEXT_INPUT_PLACEHOLDER_COLOR};
+use crate::styles::{text_input_style, NO_BORDER, NO_SHADOW, WHITE_BORDER};
 use crate::Message::Navigation;
 use crate::NavigationMessage::DevicesList;
 use crate::{device_subscription, name_from_id, Message, NavigationMessage};
-use iced::border::Radius;
 use iced::widget::button::Status::Hovered;
 use iced::widget::button::{Status, Style};
 use iced::widget::scrollable::Scrollbar;
 use iced::widget::{button, scrollable, text, text_input, Button, Column, Row};
-use iced::{Background, Border, Color, Element, Shadow, Task, Theme};
+use iced::{Background, Color, Element, Task, Theme};
 use iced_futures::core::Length::Fill;
 use iced_futures::Subscription;
 use meshtastic::protobufs::channel::Role;
@@ -28,31 +27,6 @@ use meshtastic::protobufs::from_radio::PayloadVariant;
 use meshtastic::protobufs::{Channel, NodeInfo};
 use meshtastic::utils::stream::BleId;
 use tokio::sync::mpsc::Sender;
-
-const RADIUS_2: Radius = Radius {
-    top_left: 2.0,
-    top_right: 2.0,
-    bottom_right: 2.0,
-    bottom_left: 2.0,
-};
-
-const NO_SHADOW: Shadow = Shadow {
-    color: Color::TRANSPARENT,
-    offset: iced::Vector { x: 0.0, y: 0.0 },
-    blur_radius: 0.0,
-};
-
-const WHITE_BORDER: Border = Border {
-    color: Color::WHITE,
-    width: 2.0,
-    radius: RADIUS_2,
-};
-
-const NO_BORDER: Border = Border {
-    color: Color::TRANSPARENT,
-    width: 0.0,
-    radius: RADIUS_2,
-};
 
 const VIEW_BUTTON_HOVER_STYLE: Style = Style {
     background: Some(Background::Color(Color::from_rgba(0.0, 0.8, 0.8, 1.0))),
@@ -424,16 +398,7 @@ impl DeviceView {
     fn search_box(&self) -> Element<'static, Message> {
         // TODO move styles to constants
         text_input("Search", &self.filter)
-            .style(
-                |_theme: &Theme, _status: text_input::Status| text_input::Style {
-                    background: TEXT_INPUT_BACKGROUND,
-                    border: TEXT_INPUT_BORDER,
-                    icon: Color::WHITE,
-                    placeholder: TEXT_INPUT_PLACEHOLDER_COLOR,
-                    value: Color::WHITE,
-                    selection: Default::default(),
-                },
-            )
+            .style(text_input_style)
             .padding([6, 6])
             .on_input(|s| Message::Device(SearchInput(s)))
             .into()

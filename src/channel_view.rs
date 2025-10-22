@@ -1,35 +1,21 @@
 use crate::channel_view::ChannelViewMessage::{ClearMessage, MessageInput};
 use crate::device_view::DeviceViewMessage::{ChannelMsg, SendMessage};
-use crate::styles::{TEXT_INPUT_BACKGROUND, TEXT_INPUT_BORDER, TEXT_INPUT_PLACEHOLDER_COLOR};
+use crate::styles::{text_input_style, NO_SHADOW, RADIUS_12};
 use crate::Message;
-use iced::border::Radius;
 use iced::widget::container::Style;
 use iced::widget::scrollable::Scrollbar;
 use iced::widget::{scrollable, text, text_input, Column, Container, Row, Space};
-use iced::{Background, Border, Color, Element, Fill, Left, Right, Shadow, Task, Theme};
+use iced::{Background, Border, Color, Element, Fill, Left, Right, Task, Theme};
 use meshtastic::protobufs::mesh_packet::PayloadVariant::Decoded;
 use meshtastic::protobufs::{MeshPacket, PortNum};
 use sorted_vec::SortedVec;
 use std::cmp::Ordering;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const RADIUS_12: Radius = Radius {
-    top_left: 12.0,
-    top_right: 12.0,
-    bottom_right: 12.0,
-    bottom_left: 12.0,
-};
-
 const MESSAGE_BORDER: Border = Border {
     radius: RADIUS_12, // rounded corners
     width: 2.0,
     color: Color::WHITE,
-};
-
-const NO_SHADOW: Shadow = Shadow {
-    color: Color::TRANSPARENT,
-    offset: iced::Vector { x: 0.0, y: 0.0 },
-    blur_radius: 0.0,
 };
 
 const MY_STYLE: Style = Style {
@@ -202,16 +188,7 @@ impl ChannelView {
         // TODO move styles to constants
 
         text_input("Send Message", &self.message)
-            .style(
-                |_theme: &Theme, _status: text_input::Status| text_input::Style {
-                    background: TEXT_INPUT_BACKGROUND,
-                    border: TEXT_INPUT_BORDER,
-                    icon: Color::WHITE,
-                    placeholder: TEXT_INPUT_PLACEHOLDER_COLOR,
-                    value: Color::WHITE,
-                    selection: Default::default(),
-                },
-            )
+            .style(text_input_style)
             .on_input(|s| Message::Device(ChannelMsg(MessageInput(s))))
             .on_submit(Message::Device(SendMessage(
                 self.message.clone(),
