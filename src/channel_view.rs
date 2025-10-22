@@ -1,5 +1,6 @@
 use crate::channel_view::ChannelViewMessage::{ClearMessage, MessageInput};
 use crate::device_view::DeviceViewMessage::{ChannelMsg, SendMessage};
+use crate::styles::{TEXT_INPUT_BACKGROUND, TEXT_INPUT_BORDER, TEXT_INPUT_PLACEHOLDER_COLOR};
 use crate::Message;
 use iced::border::Radius;
 use iced::widget::container::Style;
@@ -108,7 +109,7 @@ impl ChannelView {
             from: self.my_source,
             rx_time: now, // time in epoc
         });
-        // Until we have some kind of queue of messages being sent pending confirmation
+        // Until we have a queue of messages being sent pending confirmation
         self.message = String::new();
     }
 
@@ -134,7 +135,9 @@ impl ChannelView {
                 Ok(PortNum::AlertApp) => println!("Alert payload"),
                 Ok(PortNum::TelemetryApp) => println!("Telemetry payload"),
                 Ok(PortNum::NeighborinfoApp) => println!("Neighbor Info payload"),
-                Ok(PortNum::NodeinfoApp) => println!("Node Info payload"),
+                Ok(PortNum::NodeinfoApp) => {
+                    println!("User Info:");
+                }
                 _ => eprintln!("Unexpected payload type from radio: {}", data.portnum),
             }
         }
@@ -198,17 +201,13 @@ impl ChannelView {
     fn input_box(&self) -> Element<'static, Message> {
         // TODO move styles to constants
 
-        let text_box = text_input("Send Message", &self.message)
+        text_input("Send Message", &self.message)
             .style(
                 |_theme: &Theme, _status: text_input::Status| text_input::Style {
-                    background: Background::Color(Color::from_rgb8(0x40, 0x40, 0x40)),
-                    border: Border {
-                        radius: Radius::from(20.0), // rounded corners
-                        width: 2.0,
-                        color: Color::WHITE,
-                    },
+                    background: TEXT_INPUT_BACKGROUND,
+                    border: TEXT_INPUT_BORDER,
                     icon: Color::WHITE,
-                    placeholder: Color::from_rgb8(0x80, 0x80, 0x80),
+                    placeholder: TEXT_INPUT_PLACEHOLDER_COLOR,
                     value: Color::WHITE,
                     selection: Default::default(),
                 },
@@ -217,9 +216,9 @@ impl ChannelView {
             .on_submit(Message::Device(SendMessage(
                 self.message.clone(),
                 self.channel_index,
-            )));
-
-        Row::new().padding([6, 6]).push(text_box).into()
+            )))
+            .padding([6, 6])
+            .into()
     }
 }
 

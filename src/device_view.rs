@@ -10,6 +10,7 @@ use crate::device_view::DeviceViewMessage::{
     ChannelMsg, ConnectRequest, DisconnectRequest, SearchInput, SendMessage, ShowChannel,
     SubscriptionMessage,
 };
+use crate::styles::{TEXT_INPUT_BACKGROUND, TEXT_INPUT_BORDER, TEXT_INPUT_PLACEHOLDER_COLOR};
 use crate::Message::Navigation;
 use crate::NavigationMessage::DevicesList;
 use crate::{device_subscription, name_from_id, Message, NavigationMessage};
@@ -425,14 +426,10 @@ impl DeviceView {
         text_input("Search", &self.filter)
             .style(
                 |_theme: &Theme, _status: text_input::Status| text_input::Style {
-                    background: Background::Color(Color::from_rgb8(0x40, 0x40, 0x40)),
-                    border: Border {
-                        radius: Radius::from(20.0), // rounded corners
-                        width: 2.0,
-                        color: Color::WHITE,
-                    },
+                    background: TEXT_INPUT_BACKGROUND,
+                    border: TEXT_INPUT_BORDER,
                     icon: Color::WHITE,
-                    placeholder: Color::from_rgb8(0x80, 0x80, 0x80),
+                    placeholder: TEXT_INPUT_PLACEHOLDER_COLOR,
                     value: Color::WHITE,
                     selection: Default::default(),
                 },

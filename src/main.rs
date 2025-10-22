@@ -24,6 +24,7 @@ mod device_list_view;
 mod device_subscription;
 mod device_view;
 mod discovery;
+mod styles;
 // mod router;
 
 #[derive(PartialEq, Default)]
