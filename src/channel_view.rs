@@ -57,6 +57,8 @@ impl Display for ChannelId {
     }
 }
 
+// TODO show QR of the channel config
+
 pub struct ChannelView {
     pub(crate) channel_id: ChannelId,
     pub packets: Vec<MeshPacket>,

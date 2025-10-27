@@ -188,10 +188,7 @@ impl DeviceView {
                     self.subscription_sender = Some(sender);
                     Task::none()
                 }
-                DevicePacket(packet) => {
-                    self.handle_packet(packet);
-                    Task::none()
-                }
+                DevicePacket(packet) => self.handle_packet(packet),
                 MessageSent(channel_index) => {
                     if let Some(channel_view) = self.channel_views.get_mut(&channel_index) {
                         channel_view.message_sent();
@@ -228,33 +225,16 @@ impl DeviceView {
         }
     }
 
-    fn handle_packet(&mut self, packet: Box<FromRadio>) {
+    /// Handle [FromRadio] packets coming from the radio, forwarded from the device_subscription
+    fn handle_packet(&mut self, packet: Box<FromRadio>) -> Task<Message> {
         match packet.payload_variant {
             Some(PayloadVariant::Packet(mesh_packet)) => self.handle_mesh_packet(mesh_packet),
             Some(PayloadVariant::MyInfo(my_node_info)) => {
                 self.my_node_num = Some(my_node_info.my_node_num);
             }
-            Some(PayloadVariant::NodeInfo(node_info)) => {
-                if let Some(my_node_num) = self.my_node_num
-                    && my_node_num != node_info.num
-                {
-                    self.nodes.push(node_info)
-                }
-            }
+            Some(PayloadVariant::NodeInfo(node_info)) => self.add_user_node(node_info),
             // This Packet conveys information about a Channel that exists on the radio
-            Some(PayloadVariant::Channel(mut channel)) => {
-                if let Some(settings) = channel.settings.as_mut() {
-                    if settings.name.is_empty() {
-                        settings.name = "Default".to_string();
-                    };
-                    self.channels.push(channel);
-                    let channel_id = ChannelId::Channel((self.channels.len() - 1) as i32);
-                    self.channel_views.insert(
-                        channel_id.clone(),
-                        ChannelView::new(channel_id, self.my_node_num.unwrap()),
-                    );
-                }
-            }
+            Some(PayloadVariant::Channel(channel)) => self.add_channel(channel),
             Some(PayloadVariant::QueueStatus(_)) => {
                 // TODO maybe show if devices in outgoing queue?
             }
@@ -262,30 +242,59 @@ impl DeviceView {
                 // TODO could be interesting to get device_hardware value
             }
             Some(PayloadVariant::ClientNotification(notification)) => {
-                // TODO display a notification in the header
-                println!("Received notification: {}", notification.message);
+                return Task::perform(empty(), move |_| {
+                    Message::AppNotification(
+                        "Radio Notification".to_string(),
+                        notification.message.clone(),
+                    )
+                });
             }
             Some(_) => {
                 println!("Unexpected payload variant: {:?}", packet.payload_variant);
             }
             _ => println!("Error parsing packet: {:?}", packet.payload_variant),
         }
+
+        Task::none()
+    }
+
+    // Add a new node to the list if it has the User info we want and is not marked to be ignored
+    fn add_user_node(&mut self, node_info: NodeInfo) {
+        if let Some(my_node_num) = self.my_node_num
+            && my_node_num != node_info.num
+            && !node_info.is_ignored
+            && node_info.user.is_some()
+        {
+            self.nodes.push(node_info);
+        }
+    }
+
+    // Add a channel from the radio to the list if it is not disabled and has some Settings
+    fn add_channel(&mut self, mut channel: Channel) {
+        if !matches!(Role::try_from(channel.role).unwrap(), Disabled)
+            && let Some(settings) = channel.settings.as_mut()
+        {
+            if settings.name.is_empty() {
+                settings.name = "Default".to_string();
+            };
+            self.channels.push(channel);
+            let channel_id = ChannelId::Channel((self.channels.len() - 1) as i32);
+            self.channel_views.insert(
+                channel_id.clone(),
+                ChannelView::new(channel_id, self.my_node_num.unwrap()),
+            );
+        }
     }
 
     fn handle_mesh_packet(&mut self, mesh_packet: MeshPacket) {
-        if let Some(Decoded(data)) = &mesh_packet.payload_variant
-            && data.emoji == 0
-        // TODO handle emoji replies
-        {
+        if let Some(Decoded(data)) = &mesh_packet.payload_variant {
             match PortNum::try_from(data.portnum) {
-                Ok(PortNum::TextMessageApp) => {
+                Ok(PortNum::AlertApp) | Ok(PortNum::TextMessageApp) => {
                     let now = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .map(|t| t.as_secs())
                         .unwrap_or(0);
 
-                    // TODO determine if there is a packet for this node or user, and
-                    // not a channel? Then send to node view?
                     let channel_id = ChannelId::Channel(mesh_packet.channel as i32);
                     if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
                         let new_message = ChannelMessage {
@@ -296,18 +305,38 @@ impl DeviceView {
 
                         channel_view.new_message(new_message);
                     } else {
-                        eprintln!("No channel for packet received: {}", mesh_packet.channel);
+                        eprintln!("No channel for ChannelId: {}", channel_id);
                     }
                 }
-                Ok(PortNum::PositionApp) => println!("Position payload"),
-                Ok(PortNum::AlertApp) => println!("Alert payload"),
-                Ok(PortNum::TelemetryApp) => println!("Telemetry payload"),
+                Ok(PortNum::PositionApp) => {
+                    let position =
+                        meshtastic::protobufs::Position::decode(&data.payload as &[u8]).unwrap();
+                    println!("Position: {position:?}")
+                }
+                Ok(PortNum::TelemetryApp) => {
+                    let telemetry =
+                        meshtastic::protobufs::Telemetry::decode(&data.payload as &[u8]).unwrap();
+                    println!("Telemetry: {telemetry:?}")
+                }
                 Ok(PortNum::NeighborinfoApp) => println!("Neighbor Info payload"),
-                // TODO will need to parse a lot of these at the next layer up before here
                 Ok(PortNum::NodeinfoApp) => {
-                    let buf = &data.payload as &[u8];
-                    let user = meshtastic::protobufs::User::decode(buf).unwrap();
-                    println!("Ping from User: {}", user.short_name);
+                    let now = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .map(|t| t.as_secs())
+                        .unwrap_or(0);
+
+                    let user = meshtastic::protobufs::User::decode(&data.payload as &[u8]).unwrap();
+                    let channel_id = ChannelId::User(user.id);
+                    if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
+                        let new_message = ChannelMessage {
+                            text: format!("Ping from User: {}", user.short_name),
+                            from: mesh_packet.from,
+                            rx_time: now,
+                        };
+                        channel_view.new_message(new_message);
+                    } else {
+                        eprintln!("No channel for ChannelId: {}", channel_id);
+                    }
                 }
                 _ => eprintln!("Unexpected payload type from radio: {}", data.portnum),
             }
@@ -366,7 +395,6 @@ impl DeviceView {
         let mut channels_view = Column::new();
 
         for (index, channel) in self.channels.iter().enumerate() {
-            // TODO show QR of the channel config
             let channel_name = Self::channel_name(channel);
 
             // If there is a filter and the channel name does not contain it, don't show this row
@@ -374,33 +402,27 @@ impl DeviceView {
                 continue;
             }
 
-            let channel_row = match Role::try_from(channel.role).unwrap() {
-                Disabled => break,
-                _ => {
-                    let channel_id = ChannelId::Channel(index as i32);
-                    Self::channel_row(
-                        channel_name,
-                        self.channel_views.get(&channel_id).unwrap().num_packets(),
-                        channel_id,
-                    )
-                }
-            };
+            let channel_id = ChannelId::Channel(index as i32);
+            let channel_row = Self::channel_row(
+                channel_name,
+                self.channel_views.get(&channel_id).unwrap().num_packets(),
+                channel_id,
+            );
             channels_view = channels_view.push(channel_row);
         }
 
+        // We only store Nodes that have a valid user set
         for node in &self.nodes {
-            if !node.is_ignored
-                && let Some(user) = &node.user
-            {
-                // If there is a filter and the Username does not contain it, don't show this row
-                if !self.filter.is_empty() && !user.long_name.contains(&self.filter) {
-                    continue;
-                }
+            let user = &node.user.as_ref().unwrap();
 
-                channels_view = channels_view.push(Self::node_row(user.long_name.clone()));
-                // TODO can add to nodes on the channel list above if channel is "populated" (not 0?)
-                // TODO mark as a favourite if has is_favorite set
+            // If there is a filter and the Username does not contain it, don't show this row
+            if !self.filter.is_empty() && !user.long_name.contains(&self.filter) {
+                continue;
             }
+
+            channels_view = channels_view.push(Self::node_row(user.long_name.clone()));
+            // TODO can add to nodes on the channel list above if channel is "populated" (not 0?)
+            // TODO mark as a favourite if has is_favorite set
         }
 
         let channel_and_user_scroll = scrollable(channels_view)
