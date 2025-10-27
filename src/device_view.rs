@@ -1,5 +1,5 @@
 use crate::channel_message::ChannelMessage;
-use crate::channel_message::ChannelMsg::Text;
+use crate::channel_message::ChannelMsg::{Position, Text};
 use crate::channel_view::{ChannelId, ChannelView, ChannelViewMessage};
 use crate::config::Config;
 use crate::device_subscription::SubscriberMessage::{Connect, Disconnect, SendText};
@@ -317,11 +317,24 @@ impl DeviceView {
                 Ok(PortNum::PositionApp) => {
                     let position =
                         meshtastic::protobufs::Position::decode(&data.payload as &[u8]).unwrap();
-                    if let Some(sender) = self.nodes.get(&mesh_packet.from) {
-                        let user = sender.user.as_ref().unwrap();
-                        println!("Position: {position:?} from {}", user.short_name)
+                    let now = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .map(|t| t.as_secs())
+                        .unwrap_or(0);
+
+                    let channel_id = ChannelId::Node(mesh_packet.from);
+                    if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
+                        let new_message = ChannelMessage {
+                            message: Position(
+                                position.latitude_i.unwrap(),
+                                position.longitude_i.unwrap(),
+                            ),
+                            from: mesh_packet.from,
+                            rx_time: now,
+                        };
+                        channel_view.new_message(new_message);
                     } else {
-                        println!("Position: {position:?} from unknown {}", mesh_packet.from)
+                        eprintln!("No channel for ChannelId: {}", channel_id);
                     }
                 }
                 Ok(PortNum::TelemetryApp) => {

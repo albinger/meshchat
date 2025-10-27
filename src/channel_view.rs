@@ -1,4 +1,4 @@
-use crate::channel_message::ChannelMsg::Text;
+use crate::channel_message::ChannelMsg::{Position, Text};
 use crate::channel_view::ChannelId::Channel;
 use crate::channel_view::ChannelViewMessage::{ClearMessage, MessageInput};
 use crate::device_view::DeviceViewMessage::{ChannelMsg, SendMessage};
@@ -124,6 +124,12 @@ impl ChannelView {
                 Text(text_msg) => {
                     channel_view = channel_view.push(message_box(
                         text_msg.clone(),
+                        message.from == self.my_source,
+                    ));
+                }
+                Position(lat, long) => {
+                    channel_view = channel_view.push(message_box(
+                        format!("({}, {})", lat, long),
                         message.from == self.my_source,
                     ));
                 }

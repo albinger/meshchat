@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 
 pub enum ChannelMsg {
     Text(String),
+    Position(i32, i32),
 }
 
 // A text message to this user on this device, sent from another device
