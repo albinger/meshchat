@@ -1,4 +1,4 @@
-use crate::channel_message::ChannelMsg::{Position, Text};
+use crate::channel_message::ChannelMsg::{Ping, Position, Text};
 use crate::channel_view::ChannelId::Channel;
 use crate::channel_view::ChannelViewMessage::{ClearMessage, MessageInput};
 use crate::device_view::DeviceViewMessage::{ChannelMsg, SendMessage};
@@ -130,6 +130,12 @@ impl ChannelView {
                 Position(lat, long) => {
                     channel_view = channel_view.push(message_box(
                         format!("({}, {})", lat, long),
+                        message.from == self.my_source,
+                    ));
+                }
+                Ping(short_name) => {
+                    channel_view = channel_view.push(message_box(
+                        format!("Ping from user '{}'", short_name),
                         message.from == self.my_source,
                     ));
                 }

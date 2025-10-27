@@ -1,5 +1,5 @@
 use crate::channel_message::ChannelMessage;
-use crate::channel_message::ChannelMsg::{Position, Text};
+use crate::channel_message::ChannelMsg::{Ping, Position, Text};
 use crate::channel_view::{ChannelId, ChannelView, ChannelViewMessage};
 use crate::config::Config;
 use crate::device_subscription::SubscriberMessage::{Connect, Disconnect, SendText};
@@ -353,7 +353,7 @@ impl DeviceView {
                     let channel_id = ChannelId::Node(mesh_packet.from);
                     if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
                         let new_message = ChannelMessage {
-                            message: Text(format!("Ping from User: {}", user.short_name)),
+                            message: Ping(user.short_name),
                             from: mesh_packet.from,
                             rx_time: now,
                         };
