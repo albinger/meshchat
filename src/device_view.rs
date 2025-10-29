@@ -513,7 +513,7 @@ impl DeviceView {
         channel_id: ChannelId,
     ) -> Button<'static, Message> {
         let row_text = format!("{} ({})", name, num_messages);
-        button(text(row_text).shaping(text::Shaping::Advanced))
+        button(text(row_text).shaping(Advanced))
             .on_press(Message::Device(ShowChannel(Some(channel_id))))
             .width(Fill)
             .style(Self::view_button)
