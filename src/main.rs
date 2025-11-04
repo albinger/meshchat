@@ -12,6 +12,7 @@ use crate::Message::{
     AppError, AppNotification, Device, Discovery, Exit, Navigation, NewConfig, RemoveNotification,
     SaveConfig, WindowEvent,
 };
+use crate::View::DeviceList;
 use iced::border::Radius;
 use iced::widget::container::Style;
 use iced::widget::{button, Column, Container, Row};
@@ -107,9 +108,7 @@ impl MeshChat {
         match message {
             Navigation(navigation_message) => self.navigate(navigation_message),
             WindowEvent(event) => self.window_handler(event),
-            Discovery(discovery_event) => self
-                .device_list_view
-                .update(discovery_event, self.device_view.connection_state()),
+            Discovery(discovery_event) => self.device_list_view.update(discovery_event),
             Device(device_event) => self.device_view.update(device_event),
             Exit => window::get_latest().and_then(window::close),
             NewConfig(config) => {
@@ -152,12 +151,15 @@ impl MeshChat {
         let state = self.device_view.connection_state();
 
         // Always add a button to allow navigating back to the list of devices
-        let mut header = Row::new().align_y(Bottom).push(
-            button("Devices")
-                .style(chip_style)
-                .on_press(Navigation(NavigationMessage::DevicesList)),
-        );
+        let mut device_list_button = button("Devices").style(chip_style);
+        // Activate it if we are not on the device list view
+        if self.view != DeviceList {
+            device_list_button =
+                device_list_button.on_press(Navigation(NavigationMessage::DevicesList));
+        }
+        let mut header = Row::new().align_y(Bottom).push(device_list_button);
 
+        // Add to the header from the view we are currently on
         header = header.push(match self.view {
             View::DeviceList => self.device_list_view.header(state),
             View::Device => self.device_view.header(state),

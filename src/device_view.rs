@@ -181,6 +181,11 @@ impl DeviceView {
                 }
                 DisconnectedEvent(id) => {
                     self.connection_state = Disconnected(Some(id), None);
+                    self.channel_views.clear();
+                    self.nodes.clear();
+                    self.channels.clear();
+                    self.my_node_num = None;
+                    self.viewing_channel = None;
                     Task::perform(empty(), |_| Navigation(DevicesList))
                 }
                 Ready(sender) => {
@@ -374,11 +379,15 @@ impl DeviceView {
                     .width(Fill)
                     .align_x(alignment::Horizontal::Right),
             ),
-            Connecting(device) => header.push(
-                text(format!("Connecting to {}", device.name.as_ref().unwrap()))
-                    .width(Fill)
-                    .align_x(alignment::Horizontal::Right),
-            ),
+            Connecting(device) => {
+                let button = button(text(device.name.as_ref().unwrap())).style(chip_style);
+                header = header.push(button);
+                header.push(
+                    text("Connecting")
+                        .width(Fill)
+                        .align_x(alignment::Horizontal::Right),
+                )
+            }
             Connected(device) => {
                 let mut button = button(text(device.name.as_ref().unwrap())).style(chip_style);
                 // If viewing a channel of the device, allow navigating back to the device view
@@ -387,14 +396,16 @@ impl DeviceView {
                 }
                 header.push(button)
             }
-            Disconnecting(device) => header.push(
-                text(format!(
-                    "Disconnecting from {}",
-                    device.name.as_ref().unwrap()
-                ))
-                .width(Fill)
-                .align_x(alignment::Horizontal::Right),
-            ),
+            Disconnecting(device) => {
+                let button = button(text(device.name.as_ref().unwrap())).style(chip_style);
+                header = header.push(button);
+
+                header.push(
+                    text("Disconnecting")
+                        .width(Fill)
+                        .align_x(alignment::Horizontal::Right),
+                )
+            }
         };
 
         match &self.viewing_channel {

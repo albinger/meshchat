@@ -17,18 +17,7 @@ pub struct DeviceListView {
 async fn empty() {}
 
 impl DeviceListView {
-    pub fn update(
-        &mut self,
-        discovery_event: DiscoveryEvent,
-        connection_state: &ConnectionState,
-    ) -> Task<Message> {
-        // Ensure the connected device is listed, and first, even if not discovered
-        if let Connected(connected_device) = connection_state
-            && !self.discovered_devices.contains(connected_device)
-        {
-            self.discovered_devices.insert(0, connected_device.clone());
-        }
-
+    pub fn update(&mut self, discovery_event: DiscoveryEvent) -> Task<Message> {
         match discovery_event {
             DiscoveryEvent::BLERadioFound(device) => {
                 if !self.discovered_devices.contains(&device) {
@@ -76,20 +65,25 @@ impl DeviceListView {
         let mut main_col = Column::new();
         // TODO add a scrollable area in case there are a lot of devices
 
+        // Ensure the connected device is listed, and first, even if not discovered
+        if let Connected(connected_device) = connection_state {
+            let mut device_row = Row::new().align_y(alignment::Vertical::Center);
+            device_row = device_row.push(text(name_from_id(connected_device)));
+            device_row = device_row.push(Space::new(6, 0));
+            device_row = device_row.push(
+                button("Disconnect")
+                    .on_press(Device(DisconnectRequest(connected_device.clone())))
+                    .style(chip_style),
+            );
+            main_col = main_col.push(device_row);
+        }
+
         for device in &self.discovered_devices {
-            let mut device_row = Row::new().align_y(iced::alignment::Vertical::Center);
+            let mut device_row = Row::new().align_y(alignment::Vertical::Center);
             device_row = device_row.push(text(name_from_id(device)));
             device_row = device_row.push(Space::new(6, 0));
             match &connection_state {
-                Connected(connected_device) => {
-                    if connected_device.eq(device) {
-                        device_row = device_row.push(
-                            button("Disconnect")
-                                .on_press(Device(DisconnectRequest(device.clone())))
-                                .style(chip_style),
-                        );
-                    }
-                }
+                Connected(_) => {}
                 // TODO maybe show an error against it if present?
                 Disconnected(_id, _error) => {
                     device_row = device_row.push(
