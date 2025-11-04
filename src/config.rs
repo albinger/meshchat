@@ -3,14 +3,14 @@ use crate::Message;
 use directories::ProjectDirs;
 use futures_lite::io::AsyncWriteExt;
 use iced::Task;
+use meshtastic::utils::stream::BleDevice;
 use serde::{Deserialize, Serialize};
 use smol::fs::File;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
-    pub device_name: Option<String>,
-    pub device_mac_address: Option<String>,
+    pub device: Option<BleDevice>,
     pub channel_id: Option<ChannelId>,
 }
 

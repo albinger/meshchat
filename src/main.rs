@@ -1,25 +1,23 @@
 //! MeshChat is an iced GUI app that uses the meshtastic "rust" crate to discover and control
 //! meshtastic compatible radios connected to the host running it
 
-use crate::config::{load_config, save_config, Config};
-use crate::device_list_view::DeviceListView;
-use crate::device_view::ConnectionState::Connected;
-use crate::device_view::{DeviceView, DeviceViewMessage};
-use crate::discovery::{ble_discovery, DiscoveryEvent};
-use crate::linear::Linear;
 use crate::Message::{
     AppError, AppNotification, Device, Discovery, Exit, Navigation, NewConfig, RemoveNotification,
     SaveConfig, WindowEvent,
 };
-use btleplug::api::BDAddr;
+use crate::config::{Config, load_config, save_config};
+use crate::device_list_view::DeviceListView;
+use crate::device_view::ConnectionState::Connected;
+use crate::device_view::{DeviceView, DeviceViewMessage};
+use crate::discovery::{DiscoveryEvent, ble_discovery};
+use crate::linear::Linear;
 use iced::border::Radius;
 use iced::widget::container::Style;
-use iced::widget::{button, text, Column, Container, Row};
-use iced::{window, Border, Bottom, Color, Event, Subscription, Task, Theme};
+use iced::widget::{Column, Container, Row, button, text};
 use iced::{Background, Element};
+use iced::{Border, Bottom, Color, Event, Subscription, Task, Theme, window};
 use meshtastic::utils::stream::BleDevice;
 use std::cmp::PartialEq;
-use std::str::FromStr;
 use std::time::Duration;
 
 mod channel_message;
@@ -109,13 +107,11 @@ impl MeshChat {
             Device(device_event) => self.device_view.update(device_event),
             Exit => window::get_latest().and_then(window::close),
             NewConfig(config) => {
-                if let Some(device_mac_address) = &config.device_mac_address {
-                    let device = BleDevice {
-                        name: config.device_name.clone(),
-                        mac_address: BDAddr::from_str(device_mac_address).unwrap(),
-                    };
-                    self.device_view
-                        .update(DeviceViewMessage::ConnectRequest(device, config.channel_id))
+                if let Some(device) = &config.device {
+                    self.device_view.update(DeviceViewMessage::ConnectRequest(
+                        device.clone(),
+                        config.channel_id,
+                    ))
                 } else {
                     Task::none()
                 }

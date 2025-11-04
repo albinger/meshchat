@@ -431,6 +431,8 @@ dependencies = [
  "objc2-core-bluetooth",
  "objc2-foundation",
  "once_cell",
+ "serde",
+ "serde_bytes",
  "static_assertions",
  "thiserror 2.0.17",
  "tokio",
@@ -2080,7 +2082,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-stream",
- "btleplug",
  "directories",
  "futures",
  "futures-lite",
@@ -2100,7 +2101,7 @@ dependencies = [
 [[package]]
 name = "meshtastic"
 version = "0.1.7"
-source = "git+https://github.com/meshtastic/rust.git#4b7e04992a85f6188ee5b08d19008d829b573d95"
+source = "git+https://github.com/meshtastic/rust.git#bd5fe196f1ce4b748bcd3c925495cb322bca00cd"
 dependencies = [
  "bluez-async",
  "btleplug",
@@ -3178,6 +3179,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_bytes"
+version = "0.11.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5d440709e79d88e51ac01c4b72fc6cb7314017bb7da9eeff678aa94c10e3ea8"
+dependencies = [
+ "serde",
+ "serde_core",
+]
+
+[[package]]
 name = "serde_core"
 version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3900,6 +3911,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2f87b8aa10b915a06587d0dec516c282ff295b475d94abf425d62b57710070a2"
 dependencies = [
  "js-sys",
+ "serde",
  "wasm-bindgen",
 ]
 
