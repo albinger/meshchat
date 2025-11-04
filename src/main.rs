@@ -4,7 +4,7 @@
 use crate::config::{load_config, save_config, Config};
 use crate::device_list_view::DeviceListView;
 use crate::device_view::ConnectionState::Connected;
-use crate::device_view::{DeviceView, DeviceViewMessage};
+use crate::device_view::{ConnectionState, DeviceView, DeviceViewMessage};
 use crate::discovery::{ble_discovery, DiscoveryEvent};
 use crate::linear::Linear;
 use crate::styles::chip_style;
@@ -147,29 +147,32 @@ impl MeshChat {
     }
 
     fn view(&self) -> Element<'_, Message> {
+        let state = self.device_view.connection_state();
+
+        // Always add a button to allow navigating back to the list of devices
         let mut header = Row::new().align_y(Bottom).push(
             button("Devices")
                 .style(chip_style)
                 .on_press(Navigation(NavigationMessage::DevicesList)),
         );
 
-        let (inner, busy) = match self.view {
-            View::DeviceList => {
-                header = header.push(
-                    self.device_list_view
-                        .header(self.device_view.connection_state()),
-                );
-                (
-                    self.device_list_view
-                        .view(self.device_view.connection_state()),
-                    true,
-                )
-            }
-            View::Device => {
-                header = header.push(self.device_view.header(self.device_view.connection_state()));
-                (self.device_view.view(), false)
-            }
+        header = header.push(match self.view {
+            View::DeviceList => self.device_list_view.header(state),
+            View::Device => self.device_view.header(state),
+        });
+
+        // Build the inner view
+        let (inner, mut busy) = match self.view {
+            View::DeviceList => (self.device_list_view.view(state), true),
+            View::Device => (self.device_view.view(), false),
         };
+
+        // Also busy if we are connecting or disconnecting
+        busy = busy
+            || matches!(
+                state,
+                ConnectionState::Connecting(_) | ConnectionState::Disconnecting(_)
+            );
 
         let mut outer = Column::new().push(header);
         if busy {

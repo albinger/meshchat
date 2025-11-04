@@ -21,7 +21,7 @@ use iced::widget::button::{Status, Style};
 use iced::widget::scrollable::Scrollbar;
 use iced::widget::text::Shaping::Advanced;
 use iced::widget::{button, row, scrollable, text, text_input, Button, Column, Row};
-use iced::{Background, Color, Element, Task, Theme};
+use iced::{alignment, Background, Color, Element, Task, Theme};
 use iced_futures::core::Length::Fill;
 use iced_futures::Subscription;
 use meshtastic::protobufs::channel::Role;
@@ -49,7 +49,7 @@ const VIEW_BUTTON_STYLE: Style = Style {
     shadow: NO_SHADOW,
 };
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum ConnectionState {
     #[allow(dead_code)] // Remove this when the optional error string is used
     Disconnected(Option<BleDevice>, Option<String>),
@@ -366,30 +366,36 @@ impl DeviceView {
         }
     }
 
-    pub fn header<'a>(&'a self, connection_state: &'a ConnectionState) -> Row<'a, Message> {
+    pub fn header<'a>(&'a self, connection_state: &'a ConnectionState) -> Element<'a, Message> {
         let mut header: Row<Message> = Row::new();
 
         header = match connection_state {
-            Disconnected(_, _) => header.push(text("Disconnected")),
-            Connecting(device) => header.push(text(format!(
-                "Connecting to {}",
-                device.name.as_ref().unwrap()
-            ))),
+            Disconnected(_, _) => header.push(
+                text("Disconnected")
+                    .width(Fill)
+                    .align_x(alignment::Horizontal::Right),
+            ),
+            Connecting(device) => header.push(
+                text(format!("Connecting to {}", device.name.as_ref().unwrap()))
+                    .width(Fill)
+                    .align_x(alignment::Horizontal::Right),
+            ),
             Connected(device) => {
+                let mut button = button(text(device.name.as_ref().unwrap())).style(chip_style);
+                // If viewing a channel of the device, allow navigating back to the device view
                 if self.viewing_channel.is_some() {
-                    header.push(
-                        button(text(device.name.as_ref().unwrap()))
-                            .on_press(Message::Device(ShowChannel(None)))
-                            .style(chip_style),
-                    )
-                } else {
-                    header.push(button(text(device.name.as_ref().unwrap())).style(chip_style))
+                    button = button.on_press(Message::Device(ShowChannel(None)));
                 }
+                header.push(button)
             }
-            Disconnecting(device) => header.push(text(format!(
-                "Disconnecting from {}",
-                device.name.as_ref().unwrap()
-            ))),
+            Disconnecting(device) => header.push(
+                text(format!(
+                    "Disconnecting from {}",
+                    device.name.as_ref().unwrap()
+                ))
+                .width(Fill)
+                .align_x(alignment::Horizontal::Right),
+            ),
         };
 
         match &self.viewing_channel {
@@ -415,7 +421,7 @@ impl DeviceView {
             None => {}
         }
 
-        header
+        header.into()
     }
 
     pub fn view(&self) -> Element<'static, Message> {
@@ -426,10 +432,7 @@ impl DeviceView {
             }
         }
 
-        self.device_view()
-    }
-
-    fn device_view(&self) -> Element<'static, Message> {
+        // If not viewing a channel/user, show the list of channels and users
         let mut channels_view = Column::new();
 
         for (index, channel) in self.channels.iter().enumerate() {
