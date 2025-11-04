@@ -2,6 +2,7 @@ use crate::device_view::ConnectionState;
 use crate::device_view::ConnectionState::{Connected, Connecting, Disconnected, Disconnecting};
 use crate::device_view::DeviceViewMessage::{ConnectRequest, DisconnectRequest};
 use crate::discovery::DiscoveryEvent;
+use crate::styles::chip_style;
 use crate::Message::{Device, Navigation};
 use crate::{name_from_id, Message, NavigationMessage};
 use iced::widget::{button, container, text, Column, Row};
@@ -37,6 +38,7 @@ impl DeviceListView {
                 text(format!("Connecting to {}", device.name.as_ref().unwrap())).into()
             }
             Connected(device) => button(text(device.name.as_ref().unwrap()))
+                .style(chip_style)
                 .on_press(Navigation(NavigationMessage::DeviceView))
                 .into(),
             Disconnecting(device) => text(format!(
@@ -60,14 +62,17 @@ impl DeviceListView {
                     if connected_device.eq(device) {
                         device_row = device_row.push(
                             button("Disconnect")
-                                .on_press(Device(DisconnectRequest(device.clone()))),
+                                .on_press(Device(DisconnectRequest(device.clone())))
+                                .style(chip_style),
                         );
                     }
                 }
                 // TODO maybe show an error against it if present?
                 Disconnected(_id, _error) => {
                     device_row = device_row.push(
-                        button("Connect").on_press(Device(ConnectRequest(device.clone(), None))),
+                        button("Connect")
+                            .on_press(Device(ConnectRequest(device.clone(), None)))
+                            .style(chip_style),
                     );
                 }
                 Connecting(connecting_device) => {

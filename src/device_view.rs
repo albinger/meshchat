@@ -12,7 +12,7 @@ use crate::device_view::DeviceViewMessage::{
     ChannelMsg, ConnectRequest, DisconnectRequest, SearchInput, SendMessage, ShowChannel,
     SubscriptionMessage,
 };
-use crate::styles::{text_input_style, NO_BORDER, NO_SHADOW, WHITE_BORDER};
+use crate::styles::{chip_style, text_input_style, NO_BORDER, NO_SHADOW, WHITE_BORDER};
 use crate::Message::Navigation;
 use crate::NavigationMessage::DevicesList;
 use crate::{device_subscription, Message, NavigationMessage};
@@ -379,10 +379,11 @@ impl DeviceView {
                 if self.viewing_channel.is_some() {
                     header.push(
                         button(text(device.name.as_ref().unwrap()))
-                            .on_press(Message::Device(ShowChannel(None))),
+                            .on_press(Message::Device(ShowChannel(None)))
+                            .style(chip_style),
                     )
                 } else {
-                    header.push(button(text(device.name.as_ref().unwrap())))
+                    header.push(button(text(device.name.as_ref().unwrap())).style(chip_style))
                 }
             }
             Disconnecting(device) => header.push(text(format!(
@@ -397,14 +398,18 @@ impl DeviceView {
                 if let Some(channel) = self.channels.get(index) {
                     // TODO do this in channel_view code like in view() below.
                     let channel_name = Self::channel_name(channel);
-                    header = header.push(text(" / ")).push(button(text(channel_name)))
+                    header = header.push(button(text(channel_name)).style(chip_style))
                 }
             }
             Some(ChannelId::Node(node_id)) => {
                 if let Some(node_info) = self.nodes.get(node_id) {
-                    header = header.push(text(" / ")).push(button(
-                        text(node_info.user.as_ref().unwrap().long_name.clone()).shaping(Advanced),
-                    ))
+                    header = header.push(
+                        button(
+                            text(node_info.user.as_ref().unwrap().long_name.clone())
+                                .shaping(Advanced),
+                        )
+                        .style(chip_style),
+                    )
                 }
             }
             None => {}

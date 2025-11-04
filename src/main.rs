@@ -7,13 +7,14 @@ use crate::device_view::ConnectionState::Connected;
 use crate::device_view::{DeviceView, DeviceViewMessage};
 use crate::discovery::{ble_discovery, DiscoveryEvent};
 use crate::linear::Linear;
+use crate::styles::chip_style;
 use crate::Message::{
     AppError, AppNotification, Device, Discovery, Exit, Navigation, NewConfig, RemoveNotification,
     SaveConfig, WindowEvent,
 };
 use iced::border::Radius;
 use iced::widget::container::Style;
-use iced::widget::{button, text, Column, Container, Row};
+use iced::widget::{button, Column, Container, Row};
 use iced::{window, Border, Bottom, Color, Event, Subscription, Task, Theme};
 use iced::{Background, Element};
 use meshtastic::utils::stream::BleDevice;
@@ -146,9 +147,11 @@ impl MeshChat {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let mut header = Row::new()
-            .align_y(Bottom)
-            .push(button("Devices").on_press(Navigation(NavigationMessage::DevicesList)));
+        let mut header = Row::new().align_y(Bottom).push(
+            button("Devices")
+                .style(chip_style)
+                .on_press(Navigation(NavigationMessage::DevicesList)),
+        );
 
         let (inner, busy) = match self.view {
             View::DeviceList => {
@@ -163,7 +166,6 @@ impl MeshChat {
                 )
             }
             View::Device => {
-                header = header.push(text(" / "));
                 header = header.push(self.device_view.header(self.device_view.connection_state()));
                 (self.device_view.view(), false)
             }

@@ -1,6 +1,5 @@
 use iced::border::Radius;
-use iced::widget::text_input;
-use iced::widget::text_input::Status;
+use iced::widget::{button, text_input};
 use iced::{Background, Border, Color, Shadow, Theme};
 
 pub const TEXT_INPUT_BACKGROUND: Background =
@@ -47,10 +46,12 @@ const TEXT_INPUT_RADIUS: Radius = Radius {
     bottom_left: TEXT_INPUT_R,
 };
 
+const CYAN: Color = Color::from_rgba(0.0, 0.8, 0.8, 1.0);
+
 const TEXT_INPUT_BORDER_ACTIVE: Border = Border {
     radius: TEXT_INPUT_RADIUS, // rounded corners
     width: 2.0,
-    color: Color::from_rgba(0.0, 0.8, 0.8, 1.0), // Cyan
+    color: CYAN,
 };
 
 const TEXT_INPUT_BORDER: Border = Border {
@@ -67,9 +68,9 @@ const TEXT_INPUT_BORDER_DISABLED: Border = Border {
 
 pub const TEXT_INPUT_PLACEHOLDER_COLOR: Color = Color::from_rgba(0.5, 0.5, 0.5, 1.0);
 
-pub fn text_input_style(_theme: &Theme, status: Status) -> text_input::Style {
+pub fn text_input_style(_theme: &Theme, status: text_input::Status) -> text_input::Style {
     match status {
-        Status::Active => text_input::Style {
+        text_input::Status::Active => text_input::Style {
             background: TEXT_INPUT_BACKGROUND,
             border: TEXT_INPUT_BORDER,
             icon: Color::WHITE,
@@ -77,7 +78,7 @@ pub fn text_input_style(_theme: &Theme, status: Status) -> text_input::Style {
             value: Color::WHITE,
             selection: Default::default(),
         },
-        Status::Hovered => text_input::Style {
+        text_input::Status::Hovered => text_input::Style {
             background: TEXT_INPUT_BACKGROUND,
             border: TEXT_INPUT_BORDER,
             icon: Color::WHITE,
@@ -85,7 +86,7 @@ pub fn text_input_style(_theme: &Theme, status: Status) -> text_input::Style {
             value: Color::WHITE,
             selection: Default::default(),
         },
-        Status::Focused => text_input::Style {
+        text_input::Status::Focused => text_input::Style {
             background: TEXT_INPUT_BACKGROUND,
             border: TEXT_INPUT_BORDER_ACTIVE,
             icon: Color::WHITE,
@@ -93,13 +94,48 @@ pub fn text_input_style(_theme: &Theme, status: Status) -> text_input::Style {
             value: Color::WHITE,
             selection: Default::default(),
         },
-        Status::Disabled => text_input::Style {
+        text_input::Status::Disabled => text_input::Style {
             background: TEXT_INPUT_BACKGROUND,
             border: TEXT_INPUT_BORDER_DISABLED,
             icon: Color::WHITE,
             placeholder: TEXT_INPUT_PLACEHOLDER_COLOR,
             value: Color::WHITE,
             selection: Default::default(),
+        },
+    }
+}
+
+const BUTTON_BORDER_ACTIVE: Border = Border {
+    radius: TEXT_INPUT_RADIUS, // rounded corners
+    width: 2.0,
+    color: CYAN,
+};
+
+pub fn chip_style(_theme: &Theme, status: button::Status) -> button::Style {
+    match status {
+        button::Status::Active => button::Style {
+            background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.8, 1.0))),
+            text_color: Color::WHITE,
+            border: BUTTON_BORDER_ACTIVE,
+            shadow: NO_SHADOW,
+        },
+        button::Status::Hovered => button::Style {
+            background: Some(Background::Color(CYAN)),
+            text_color: Color::WHITE,
+            border: BUTTON_BORDER_ACTIVE,
+            shadow: NO_SHADOW,
+        },
+        button::Status::Pressed => button::Style {
+            background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.8, 1.0))),
+            text_color: Color::WHITE,
+            border: BUTTON_BORDER_ACTIVE,
+            shadow: NO_SHADOW,
+        },
+        button::Status::Disabled => button::Style {
+            background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.8, 1.0))),
+            text_color: Color::WHITE,
+            border: BUTTON_BORDER_ACTIVE,
+            shadow: NO_SHADOW,
         },
     }
 }
