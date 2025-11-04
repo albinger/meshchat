@@ -1,21 +1,21 @@
 //! MeshChat is an iced GUI app that uses the meshtastic "rust" crate to discover and control
 //! meshtastic compatible radios connected to the host running it
 
+use crate::config::{load_config, save_config, Config};
+use crate::device_list_view::DeviceListView;
+use crate::device_view::ConnectionState::Connected;
+use crate::device_view::{DeviceView, DeviceViewMessage};
+use crate::discovery::{ble_discovery, DiscoveryEvent};
+use crate::linear::Linear;
 use crate::Message::{
     AppError, AppNotification, Device, Discovery, Exit, Navigation, NewConfig, RemoveNotification,
     SaveConfig, WindowEvent,
 };
-use crate::config::{Config, load_config, save_config};
-use crate::device_list_view::DeviceListView;
-use crate::device_view::ConnectionState::Connected;
-use crate::device_view::{DeviceView, DeviceViewMessage};
-use crate::discovery::{DiscoveryEvent, ble_discovery};
-use crate::linear::Linear;
 use iced::border::Radius;
 use iced::widget::container::Style;
-use iced::widget::{Column, Container, Row, button, text};
+use iced::widget::{button, text, Column, Container, Row};
+use iced::{window, Border, Bottom, Color, Event, Subscription, Task, Theme};
 use iced::{Background, Element};
-use iced::{Border, Bottom, Color, Event, Subscription, Task, Theme, window};
 use meshtastic::utils::stream::BleDevice;
 use std::cmp::PartialEq;
 use std::time::Duration;
@@ -45,9 +45,12 @@ pub enum NavigationMessage {
     DeviceView,
 }
 
-enum NotificationType {
-    Error,
-    Info,
+/// A [Notification] can be one of two notification types:
+/// - Error(summary, detail)
+/// - Info(summary, detail)
+enum Notification {
+    Error(String, String),
+    Info(String, String),
 }
 
 #[derive(Default)]
@@ -55,7 +58,7 @@ struct MeshChat {
     view: View,
     device_list_view: DeviceListView,
     device_view: DeviceView,
-    notifications: Vec<(usize, NotificationType, String, String)>,
+    notifications: Vec<(usize, Notification)>,
     next_id: usize,
 }
 
@@ -117,11 +120,11 @@ impl MeshChat {
                 }
             }
             AppNotification(summary, detail) => {
-                self.add_notification(NotificationType::Info, summary, detail);
+                self.add_notification(Notification::Info(summary, detail));
                 Task::none()
             }
             AppError(summary, detail) => {
-                self.add_notification(NotificationType::Error, summary, detail);
+                self.add_notification(Notification::Error(summary, detail));
                 Task::none()
             }
             Message::None => Task::none(),
@@ -133,15 +136,9 @@ impl MeshChat {
         }
     }
 
-    fn add_notification(
-        &mut self,
-        notification_type: NotificationType,
-        summary: String,
-        detail: String,
-    ) {
-        self.notifications
-            .push((self.next_id, notification_type, summary, detail));
-        self.next_id += 1; // TODO wrapped add
+    fn add_notification(&mut self, notification: Notification) {
+        self.notifications.push((self.next_id, notification));
+        self.next_id += 1;
     }
 
     fn remove_notification(&mut self, id: usize) {
@@ -187,25 +184,6 @@ impl MeshChat {
         outer.into()
     }
 
-    fn notifications(&self) -> Element<'_, Message> {
-        let mut notifications = Row::new().padding(10);
-
-        // TODO a box with color and a cancel button that removes this error
-        // larger font for summary, detail can be unfolded
-        for (id, notification_type, summary, details) in &self.notifications {
-            match notification_type {
-                NotificationType::Error => {
-                    notifications = notifications.push(Self::error(*id, summary, details));
-                }
-                NotificationType::Info => {
-                    notifications = notifications.push(Self::info(*id, summary, details));
-                }
-            }
-        }
-
-        notifications.into()
-    }
-
     /// Subscribe to events from Discover and from Windows and from Devices (Radios)
     fn subscription(&self) -> Subscription<Message> {
         let subscriptions = vec![
@@ -244,12 +222,30 @@ impl MeshChat {
         }
     }
 
-    fn info<'a>(id: usize, summary: &'a str, _detail: &'a str) -> Element<'a, Message> {
-        Self::info_box(id, summary)
+    fn notifications(&self) -> Element<'_, Message> {
+        let mut notifications = Row::new().padding(10);
+
+        // TODO a box with color and a cancel button that removes this error
+        // larger font for summary, detail can be unfolded
+        for (id, notification) in &self.notifications {
+            match notification {
+                Notification::Error(summary, details) => {
+                    notifications =
+                        notifications.push(Self::error_box(*id, summary.clone(), details.clone()));
+                }
+                Notification::Info(summary, details) => {
+                    notifications =
+                        notifications.push(Self::info_box(*id, summary.clone(), details.clone()));
+                }
+            }
+        }
+
+        notifications.into()
     }
 
-    fn error_box(id: usize, text: &str) -> Element<'_, Message> {
-        let row = Row::new().push(iced::widget::text(text));
+    // TODO accept detail and make it in an expandable box
+    fn error_box(id: usize, summary: String, _detail: String) -> Element<'static, Message> {
+        let row = Row::new().push(iced::widget::text(summary));
         let row = row.push(button("OK").on_press(Message::RemoveNotification(id)));
 
         Container::new(row)
@@ -267,8 +263,9 @@ impl MeshChat {
             .into()
     }
 
-    fn info_box(id: usize, text: &str) -> Element<'_, Message> {
-        let row = Row::new().push(iced::widget::text(text));
+    // TODO accept detail and make it in an expandable box
+    fn info_box(id: usize, summary: String, _detail: String) -> Element<'static, Message> {
+        let row = Row::new().push(iced::widget::text(summary));
         let row = row.push(button("OK").on_press(Message::RemoveNotification(id)));
 
         Container::new(row)
@@ -284,9 +281,5 @@ impl MeshChat {
                 ..Default::default()
             })
             .into()
-    }
-
-    fn error<'a>(id: usize, summary: &'a str, _detail: &'a str) -> Element<'a, Message> {
-        Self::error_box(id, summary)
     }
 }
