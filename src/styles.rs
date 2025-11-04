@@ -50,7 +50,7 @@ const TEXT_INPUT_RADIUS: Radius = Radius {
 const TEXT_INPUT_BORDER_ACTIVE: Border = Border {
     radius: TEXT_INPUT_RADIUS, // rounded corners
     width: 2.0,
-    color: Color::from_rgba(0.0, 0.8, 0.8, 1.0),
+    color: Color::from_rgba(0.0, 0.8, 0.8, 1.0), // Cyan
 };
 
 const TEXT_INPUT_BORDER: Border = Border {
@@ -77,7 +77,15 @@ pub fn text_input_style(_theme: &Theme, status: Status) -> text_input::Style {
             value: Color::WHITE,
             selection: Default::default(),
         },
-        Status::Hovered | Status::Focused => text_input::Style {
+        Status::Hovered => text_input::Style {
+            background: TEXT_INPUT_BACKGROUND,
+            border: TEXT_INPUT_BORDER,
+            icon: Color::WHITE,
+            placeholder: TEXT_INPUT_PLACEHOLDER_COLOR,
+            value: Color::WHITE,
+            selection: Default::default(),
+        },
+        Status::Focused => text_input::Style {
             background: TEXT_INPUT_BACKGROUND,
             border: TEXT_INPUT_BORDER_ACTIVE,
             icon: Color::WHITE,

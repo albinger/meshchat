@@ -1,5 +1,3 @@
-use crate::Message::Navigation;
-use crate::NavigationMessage::DevicesList;
 use crate::channel_message::ChannelMessage;
 use crate::channel_message::ChannelMsg::{Ping, Position, Text};
 use crate::channel_view::{ChannelId, ChannelView, ChannelViewMessage};
@@ -14,23 +12,25 @@ use crate::device_view::DeviceViewMessage::{
     ChannelMsg, ConnectRequest, DisconnectRequest, SearchInput, SendMessage, ShowChannel,
     SubscriptionMessage,
 };
-use crate::styles::{NO_BORDER, NO_SHADOW, WHITE_BORDER, text_input_style};
-use crate::{Message, NavigationMessage, device_subscription};
+use crate::styles::{text_input_style, NO_BORDER, NO_SHADOW, WHITE_BORDER};
+use crate::Message::Navigation;
+use crate::NavigationMessage::DevicesList;
+use crate::{device_subscription, Message, NavigationMessage};
 use iced::widget::button::Status::Hovered;
 use iced::widget::button::{Status, Style};
 use iced::widget::scrollable::Scrollbar;
 use iced::widget::text::Shaping::Advanced;
-use iced::widget::{Button, Column, Row, button, scrollable, text, text_input};
+use iced::widget::{button, row, scrollable, text, text_input, Button, Column, Row};
 use iced::{Background, Color, Element, Task, Theme};
-use iced_futures::Subscription;
 use iced_futures::core::Length::Fill;
-use meshtastic::Message as _;
+use iced_futures::Subscription;
 use meshtastic::protobufs::channel::Role;
 use meshtastic::protobufs::channel::Role::*;
 use meshtastic::protobufs::from_radio::PayloadVariant;
 use meshtastic::protobufs::mesh_packet::PayloadVariant::Decoded;
 use meshtastic::protobufs::{Channel, FromRadio, MeshPacket, NodeInfo, PortNum};
 use meshtastic::utils::stream::BleDevice;
+use meshtastic::Message as _;
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::mpsc::Sender;
@@ -472,7 +472,6 @@ impl DeviceView {
             .height(Fill);
 
         Column::new()
-            .padding(12)
             .push(self.search_box())
             .push(channel_and_user_scroll)
             .into()
@@ -519,12 +518,13 @@ impl DeviceView {
     }
 
     fn search_box(&self) -> Element<'static, Message> {
-        // TODO move styles to constants
-        text_input("Search for Channel or User", &self.filter)
+        row([text_input("Search for Channel or User", &self.filter)
             .style(text_input_style)
             .padding([6, 6])
             .on_input(|s| Message::Device(SearchInput(s)))
-            .into()
+            .into()])
+        .padding([0, 4]) // 6 pixel spacing minus the 2 pixel border width
+        .into()
     }
 
     /// Create subscriptions for events coming from a connected hardware device (radio)
