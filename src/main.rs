@@ -8,16 +8,18 @@ use crate::device_view::{DeviceView, DeviceViewMessage};
 use crate::discovery::{ble_discovery, DiscoveryEvent};
 use crate::linear::Linear;
 use crate::Message::{
-    AppError, AppNotification, Device, Discovery, Exit, Navigation, NewConfig, SaveConfig,
-    WindowEvent,
+    AppError, AppNotification, Device, Discovery, Exit, Navigation, NewConfig, RemoveNotification,
+    SaveConfig, WindowEvent,
 };
+use btleplug::api::BDAddr;
 use iced::border::Radius;
 use iced::widget::container::Style;
 use iced::widget::{button, text, Column, Container, Row};
 use iced::{window, Border, Bottom, Color, Event, Subscription, Task, Theme};
 use iced::{Background, Element};
-use meshtastic::utils::stream::BleId;
+use meshtastic::utils::stream::BleDevice;
 use std::cmp::PartialEq;
+use std::str::FromStr;
 use std::time::Duration;
 
 mod channel_message;
@@ -83,12 +85,10 @@ fn main() -> iced::Result {
         .run_with(MeshChat::new)
 }
 
-pub fn name_from_id(id: &BleId) -> String {
-    match id {
-        BleId::Name(name) => name.to_string(),
-        BleId::MacAddress(mac) => mac.to_string(),
-        BleId::NameAndMac(name, _) => name.to_string(),
-    }
+pub fn name_from_id(id: &BleDevice) -> String {
+    id.name
+        .clone()
+        .unwrap_or_else(|| id.mac_address.to_string())
 }
 
 impl MeshChat {
@@ -109,11 +109,13 @@ impl MeshChat {
             Device(device_event) => self.device_view.update(device_event),
             Exit => window::get_latest().and_then(window::close),
             NewConfig(config) => {
-                if let Some(name) = &config.device_name {
-                    self.device_view.update(DeviceViewMessage::ConnectRequest(
-                        name.clone(),
-                        config.channel_id,
-                    ))
+                if let Some(device_mac_address) = &config.device_mac_address {
+                    let device = BleDevice {
+                        name: config.device_name.clone(),
+                        mac_address: BDAddr::from_str(device_mac_address).unwrap(),
+                    };
+                    self.device_view
+                        .update(DeviceViewMessage::ConnectRequest(device, config.channel_id))
                 } else {
                     Task::none()
                 }
@@ -128,7 +130,7 @@ impl MeshChat {
             }
             Message::None => Task::none(),
             SaveConfig(config) => save_config(config),
-            Message::RemoveNotification(id) => {
+            RemoveNotification(id) => {
                 self.remove_notification(id);
                 Task::none()
             }

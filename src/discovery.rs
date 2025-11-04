@@ -1,42 +1,19 @@
 use iced::futures::{SinkExt, Stream};
 use iced::stream;
-use meshtastic::utils::stream::available_ble_devices;
-use meshtastic::utils::stream::BleId;
+use meshtastic::utils::stream::{available_ble_devices, BleDevice};
 use std::time::Duration;
 
 #[derive(Debug, Clone)]
 pub enum DiscoveryEvent {
-    BLERadioFound(BleId),
-    BLERadioLost(BleId),
+    BLERadioFound(BleDevice),
+    BLERadioLost(BleDevice),
     Error(String),
-}
-
-pub fn compare_bleid(left: &BleId, right: &BleId) -> bool {
-    match left {
-        BleId::Name(left_name) => match right {
-            BleId::Name(right_name) => left_name == right_name,
-            BleId::MacAddress(_) => false,
-            BleId::NameAndMac(right_name, _) => left_name == right_name,
-        },
-        BleId::MacAddress(left_address) => match right {
-            BleId::Name(_) => false,
-            BleId::MacAddress(right_address) => left_address == right_address,
-            BleId::NameAndMac(_, right_address) => left_address == right_address,
-        },
-        BleId::NameAndMac(left_name, left_address) => match right {
-            BleId::Name(right_name) => left_name == right_name,
-            BleId::MacAddress(right_address) => left_address == right_address,
-            BleId::NameAndMac(right_name, right_address) => {
-                left_name == right_name && left_address == right_address
-            }
-        },
-    }
 }
 
 /// A stream of [DiscoveryEvent] announcing the discovery or loss of devices via BLE
 pub fn ble_discovery() -> impl Stream<Item = DiscoveryEvent> {
     stream::channel(100, move |mut gui_sender| async move {
-        let mut mesh_radio_ids: Vec<BleId> = vec![];
+        let mut mesh_radio_ids: Vec<BleDevice> = vec![];
 
         // loop scanning for devices
         loop {
@@ -44,10 +21,7 @@ pub fn ble_discovery() -> impl Stream<Item = DiscoveryEvent> {
                 Ok(radios_now_ids) => {
                     // detect lost radios
                     for id in &mesh_radio_ids {
-                        if !radios_now_ids
-                            .iter()
-                            .any(|other_id| compare_bleid(id, other_id))
-                        {
+                        if !radios_now_ids.iter().any(|other_id| id == other_id) {
                             // inform GUI of a device lost
                             gui_sender
                                 .send(DiscoveryEvent::BLERadioLost(id.clone()))
@@ -58,10 +32,7 @@ pub fn ble_discovery() -> impl Stream<Item = DiscoveryEvent> {
 
                     // detect new radios found
                     for id in &radios_now_ids {
-                        if !mesh_radio_ids
-                            .iter()
-                            .any(|other_id| compare_bleid(id, other_id))
-                        {
+                        if !mesh_radio_ids.iter().any(|other_id| id == other_id) {
                             // track it for the future
                             mesh_radio_ids.push(id.clone());
 

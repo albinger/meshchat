@@ -1,16 +1,16 @@
 use crate::device_view::ConnectionState;
 use crate::device_view::ConnectionState::{Connected, Connecting, Disconnected, Disconnecting};
 use crate::device_view::DeviceViewMessage::{ConnectRequest, DisconnectRequest};
-use crate::discovery::{compare_bleid, DiscoveryEvent};
+use crate::discovery::DiscoveryEvent;
 use crate::Message::{Device, Navigation};
 use crate::{name_from_id, Message, NavigationMessage};
 use iced::widget::{button, container, text, Column, Row};
 use iced::{Element, Length, Task};
-use meshtastic::utils::stream::BleId;
+use meshtastic::utils::stream::BleDevice;
 
 #[derive(Default)]
 pub struct DeviceListView {
-    devices: Vec<BleId>,
+    devices: Vec<BleDevice>,
 }
 
 async fn empty() {}
@@ -19,9 +19,7 @@ impl DeviceListView {
     pub fn update(&mut self, discovery_event: DiscoveryEvent) -> Task<Message> {
         match discovery_event {
             DiscoveryEvent::BLERadioFound(id) => self.devices.push(id),
-            DiscoveryEvent::BLERadioLost(id) => self
-                .devices
-                .retain(|other_id| !compare_bleid(other_id, &id)),
+            DiscoveryEvent::BLERadioLost(id) => self.devices.retain(|other_id| other_id != &id),
             DiscoveryEvent::Error(e) => {
                 return Task::perform(empty(), move |_| {
                     Message::AppError("Discovery Error".to_string(), e.to_string())
@@ -35,11 +33,17 @@ impl DeviceListView {
     pub fn header<'a>(&'a self, connection_state: &'a ConnectionState) -> Element<'a, Message> {
         match connection_state {
             Disconnected(_, _) => text("Disconnected").into(),
-            Connecting(name) => text(format!("Connecting to {}", name)).into(),
-            Connected(name) => button(text(name))
+            Connecting(device) => {
+                text(format!("Connecting to {}", device.name.as_ref().unwrap())).into()
+            }
+            Connected(device) => button(text(device.name.as_ref().unwrap()))
                 .on_press(Navigation(NavigationMessage::DeviceView))
                 .into(),
-            Disconnecting(name) => text(format!("Disconnecting from {}", name)).into(),
+            Disconnecting(device) => text(format!(
+                "Disconnecting from {}",
+                device.name.as_ref().unwrap()
+            ))
+            .into(),
         }
     }
 
@@ -48,31 +52,31 @@ impl DeviceListView {
         // TODO add a scanning bar at the top
         // TODO add a scrollable area in case there are a lot of devices
 
-        for id in &self.devices {
+        for device in &self.devices {
             let mut device_row = Row::new();
-            device_row = device_row.push(text(name_from_id(id)));
+            device_row = device_row.push(text(name_from_id(device)));
             match &connection_state {
-                Connected(connected_device_name) => {
-                    if connected_device_name.eq(&name_from_id(id)) {
+                Connected(connected_device) => {
+                    if connected_device.eq(device) {
                         device_row = device_row.push(
                             button("Disconnect")
-                                .on_press(Device(DisconnectRequest(name_from_id(id)))),
+                                .on_press(Device(DisconnectRequest(device.clone()))),
                         );
                     }
                 }
                 // TODO maybe show an error against it if present?
                 Disconnected(_id, _error) => {
                     device_row = device_row.push(
-                        button("Connect").on_press(Device(ConnectRequest(name_from_id(id), None))),
+                        button("Connect").on_press(Device(ConnectRequest(device.clone(), None))),
                     );
                 }
                 Connecting(connecting_device) => {
-                    if connecting_device.eq(&name_from_id(id)) {
+                    if connecting_device == device {
                         device_row = device_row.push(text("Connecting"));
                     }
                 }
                 Disconnecting(disconnecting_device) => {
-                    if disconnecting_device.eq(&name_from_id(id)) {
+                    if disconnecting_device == device {
                         device_row = device_row.push(text("Disconnecting"));
                     }
                 }

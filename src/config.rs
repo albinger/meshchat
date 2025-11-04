@@ -10,6 +10,7 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
     pub device_name: Option<String>,
+    pub device_mac_address: Option<String>,
     pub channel_id: Option<ChannelId>,
 }
 

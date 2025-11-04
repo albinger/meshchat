@@ -15,7 +15,7 @@ use meshtastic::protobufs::from_radio::PayloadVariant::{
 };
 use meshtastic::protobufs::FromRadio;
 use meshtastic::utils;
-use meshtastic::utils::stream::BleId;
+use meshtastic::utils::stream::BleDevice;
 use std::pin::Pin;
 use std::time::Duration;
 use tokio::sync::mpsc::{channel, Sender};
@@ -23,20 +23,19 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_stream::{Stream, StreamExt};
 
 #[derive(Debug, Clone)]
-
 pub enum SubscriptionEvent {
     /// A message from the subscription to indicate it is ready to receive messages
     Ready(Sender<SubscriberMessage>),
-    ConnectedEvent(BleId),
-    DisconnectedEvent(BleId),
+    ConnectedEvent(BleDevice),
+    DisconnectedEvent(BleDevice),
     DevicePacket(Box<FromRadio>),
     MessageSent(ChannelId), // Maybe add type for when we send emojis or something else
-    ConnectionError(BleId, String, String),
+    ConnectionError(BleDevice, String, String),
 }
 
 /// A message type sent from the UI to the subscriber
 pub enum SubscriberMessage {
-    Connect(BleId),
+    Connect(BleDevice),
     Disconnect,
     SendText(String, ChannelId),
     Radio(Box<FromRadio>),
@@ -44,7 +43,7 @@ pub enum SubscriberMessage {
 
 enum DeviceState {
     Disconnected,
-    Connected(BleId, PacketReceiver),
+    Connected(BleDevice, PacketReceiver),
 }
 
 /// A stream of [DeviceViewMessage] announcing the discovery or loss of devices via BLE
@@ -75,22 +74,22 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
                 Disconnected => {
                     // Wait for a message from the UI to request that we connect to a device
                     // No need to wait for any messages from a radio, as we are not connected to one
-                    if let Some(Connect(id)) = subscriber_receiver.next().await {
-                        match do_connect(&id).await {
+                    if let Some(Connect(device)) = subscriber_receiver.next().await {
+                        match do_connect(&device).await {
                             Ok((packet_receiver, stream)) => {
-                                device_state = Connected(id.clone(), packet_receiver);
+                                device_state = Connected(device.clone(), packet_receiver);
                                 stream_api = Some(stream);
 
                                 gui_sender
-                                    .send(ConnectedEvent(id.clone()))
+                                    .send(ConnectedEvent(device.clone()))
                                     .await
                                     .unwrap_or_else(|e| eprintln!("Send error: {e}"));
                             }
                             Err(e) => {
                                 gui_sender
                                     .send(ConnectionError(
-                                        id.clone(),
-                                        format!("Failed to connect to {}", name_from_id(&id)),
+                                        device.clone(),
+                                        format!("Failed to connect to {}", name_from_id(&device)),
                                         e.to_string(),
                                     ))
                                     .await
@@ -167,8 +166,11 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
     })
 }
 
-async fn do_connect(id: &BleId) -> Result<(PacketReceiver, ConnectedStreamApi), anyhow::Error> {
-    let ble_stream = utils::stream::build_ble_stream(id, Duration::from_secs(4)).await?;
+async fn do_connect(
+    device: &BleDevice,
+) -> Result<(PacketReceiver, ConnectedStreamApi), anyhow::Error> {
+    let ble_stream =
+        utils::stream::build_ble_stream(&device.mac_address.into(), Duration::from_secs(4)).await?;
     let stream_api = StreamApi::new();
     let (packet_receiver, stream_api) = stream_api.connect(ble_stream).await;
     let config_id = utils::generate_rand_id();
