@@ -2,10 +2,9 @@
 //! meshtastic compatible radios connected to the host running it
 
 use crate::config::{load_config, save_config, Config};
-use crate::device_list_view::DeviceListView;
+use crate::device_list_view::{ble_discovery, DeviceListView, DiscoveryEvent};
 use crate::device_view::ConnectionState::Connected;
 use crate::device_view::{ConnectionState, DeviceView, DeviceViewMessage};
-use crate::discovery::{ble_discovery, DiscoveryEvent};
 use crate::linear::Linear;
 use crate::styles::chip_style;
 use crate::Message::{
@@ -28,7 +27,6 @@ mod config;
 mod device_list_view;
 mod device_subscription;
 mod device_view;
-mod discovery;
 mod easing;
 mod linear;
 mod styles;
@@ -161,13 +159,13 @@ impl MeshChat {
 
         // Add to the header from the view we are currently on
         header = header.push(match self.view {
-            View::DeviceList => self.device_list_view.header(state),
+            DeviceList => self.device_list_view.header(state),
             View::Device => self.device_view.header(state),
         });
 
         // Build the inner view
         let (inner, mut busy) = match self.view {
-            View::DeviceList => (self.device_list_view.view(state), true),
+            DeviceList => (self.device_list_view.view(state), true),
             View::Device => (self.device_view.view(), false),
         };
 
@@ -208,7 +206,7 @@ impl MeshChat {
         match navigation_message {
             NavigationMessage::DevicesList => {
                 if self.view == View::Device {
-                    self.view = View::DeviceList;
+                    self.view = DeviceList;
                 }
             }
             NavigationMessage::DeviceView => {
