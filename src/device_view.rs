@@ -59,7 +59,7 @@ pub enum ConnectionState {
 #[derive(Debug, Clone)]
 pub enum DeviceViewMessage {
     ConnectRequest(BleDevice, Option<ChannelId>),
-    DisconnectRequest(BleDevice),
+    DisconnectRequest(BleDevice, bool), // bool is to exit or not
     SubscriptionMessage(SubscriptionEvent),
     ShowChannel(Option<ChannelId>),
     ChannelMsg(ChannelViewMessage),
@@ -76,6 +76,7 @@ pub struct DeviceView {
     pub(crate) viewing_channel: Option<ChannelId>,
     channel_views: HashMap<ChannelId, ChannelView>,
     filter: String,
+    exit_pending: bool,
 }
 
 async fn request_connection(sender: Sender<SubscriberMessage>, device: BleDevice) {
@@ -109,6 +110,7 @@ impl DeviceView {
             viewing_channel: None, // No channel is being shown by default
             channel_views: HashMap::new(),
             filter: String::default(),
+            exit_pending: false,
         }
     }
 
@@ -134,7 +136,8 @@ impl DeviceView {
                     Navigation(View::Device)
                 })
             }
-            DisconnectRequest(name) => {
+            DisconnectRequest(name, exit) => {
+                self.exit_pending = exit;
                 self.connection_state = Disconnecting(name); // TODO make state change depend on message back from subscription
                 // Send a message to the subscription to disconnect
                 let sender = self.subscription_sender.clone();
@@ -179,6 +182,9 @@ impl DeviceView {
                     }
                 }
                 DisconnectedEvent(id) => {
+                    if self.exit_pending {
+                        std::process::exit(0);
+                    }
                     self.connection_state = Disconnected(Some(id), None);
                     self.channel_views.clear();
                     self.nodes.clear();
@@ -373,11 +379,14 @@ impl DeviceView {
         let mut header: Row<Message> = Row::new();
 
         header = match connection_state {
-            Disconnected(_, _) => header.push(
-                text("Disconnected")
-                    .width(Fill)
-                    .align_x(alignment::Horizontal::Right),
-            ),
+            Disconnected(_, _) => {
+                println!("Disconnected");
+                header.push(
+                    text("Disconnected")
+                        .width(Fill)
+                        .align_x(alignment::Horizontal::Right),
+                )
+            }
             Connecting(device) => {
                 let button = button(text(device.name.as_ref().unwrap())).style(chip_style);
                 header = header.push(button);

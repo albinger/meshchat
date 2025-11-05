@@ -82,7 +82,7 @@ impl DeviceListView {
             device_row = device_row.push(Space::new(6, 0));
             device_row = device_row.push(
                 button("Disconnect")
-                    .on_press(Device(DisconnectRequest(connected_device.clone())))
+                    .on_press(Device(DisconnectRequest(connected_device.clone(), false)))
                     .style(chip_style),
             );
             main_col = main_col.push(device_row);

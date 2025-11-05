@@ -4,6 +4,7 @@
 use crate::config::{load_config, save_config, Config};
 use crate::device_list_view::{ble_discovery, DeviceListView, DiscoveryEvent};
 use crate::device_view::ConnectionState::Connected;
+use crate::device_view::DeviceViewMessage::DisconnectRequest;
 use crate::device_view::{ConnectionState, DeviceView, DeviceViewMessage};
 use crate::linear::Linear;
 use crate::styles::chip_style;
@@ -200,11 +201,14 @@ impl MeshChat {
         Task::none()
     }
 
+    async fn empty() {}
+
     fn window_handler(&mut self, event: Event) -> Task<Message> {
         if let Event::Window(window::Event::CloseRequested) = event {
-            if let Connected(_id) = self.device_view.connection_state().clone() {
-                // TODO send message to subscription to request we disconnect
-                Task::none()
+            if let Connected(device) = self.device_view.connection_state().clone() {
+                Task::perform(Self::empty(), move |_| {
+                    Device(DisconnectRequest(device.clone(), true))
+                })
             } else {
                 window::get_latest().and_then(window::close)
             }

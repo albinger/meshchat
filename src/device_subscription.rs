@@ -104,8 +104,6 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
 
                     let mut merged_stream = radio_stream.merge(&mut subscriber_receiver);
 
-                    // TODO receive either types of message: FromRadio or SubscriberMessage from the merged stream
-                    // This is the code that works to handle the radio packets
                     while let Some(message) = StreamExt::next(&mut merged_stream).await {
                         match message {
                             Connect(_) => eprintln!("Already connected!"),
