@@ -6,19 +6,41 @@ readme = "README.md"
 repository = "https://github.com/andrewdavidmackenzie/meshchat"
 
 [dependencies]
-meshtastic = { version = "0.1.7", git = "https://github.com/meshtastic/rust.git", features = ["bluetooth-le"] }
+meshtastic = { version = "0.1.7", git = "https://github.com/meshtastic/rust.git", default-features = false, features = ["serde", "tokio", "bluetooth-le"] }
 iced = { version = "0.13.1", features = ["tokio", "advanced", "canvas"] }
 iced_futures = { version = "0.13", default-features = false }
-anyhow = "1.0.100"
-directories = "6.0.0"
+# for saving config files in platform dependent directories
+directories = { version = "6.0.0", default-features = false }
+# for serialization and deserialization of config struct
 serde = { version = "1.0.228", default-features = false, features = ["derive"] }
-toml = "0.9.7"
-smol = "2.0.2"
-futures-lite = "2.6.1"
-futures = "0.3.31"
-tokio-stream = "0.1.17"
-async-stream = "0.3.6"
-tokio = "1.47.1"
-sorted-vec = "0.8.10"
-lyon_algorithms = "1.0"
-once_cell = "1.21.3"
+# for serialization and deserialization of Config to toml format
+toml = { version = "0.9.7", default-features = false, features = ["serde", "parse", "display"] }
+# For gui.send to send messages to UI from device_subscription.rs
+futures = { version = "0.3.31", default-features = false }
+# For receiving messages from UI in device_subscription.rs
+tokio-stream = { version = "0.1.17", default-features = false }
+# For receiving messages from UI in device_subscription.rs
+async-stream = { version = "0.3.6", default-features = false }
+tokio = { version = "1.47.1", default-features = false }
+# For ordering messages in ChannelView
+sorted-vec = { version = "0.8.10", default-features = false }
+# For horizontal busy bar in easing.rs
+lyon_algorithms = { version = "1.0", default-features = false }
+
+# With the standard release profile, binary size was: 10,756,272 (10.7MB)
+# With these changes the binary size reduced to: 5,596,848 (5.56MB)
+# After removing smol and futures_lite dependencies: 5,281,344 (5.3MB)
+# After replacing once_cell in easing.rs with std lib version: 5,563,616 (5.6MB)
+# After removing anyhow: 5,530,448 (5.5MB)
+# Pending to try
+#   - default-features = false for iced crate, currently changes theme used
+#   - see if async stuff in device_subscription.rs can be done with fewer dependencies
+[profile.release]
+debug = false
+lto = true
+strip = true
+opt-level = 3
+codegen-units = 1
+panic = "abort"
+incremental = false
+overflow-checks = false

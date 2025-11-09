@@ -1,12 +1,14 @@
 use crate::channel_view::ChannelId;
 use crate::Message;
 use directories::ProjectDirs;
-use futures_lite::io::AsyncWriteExt;
 use iced::Task;
 use meshtastic::utils::stream::BleDevice;
 use serde::{Deserialize, Serialize};
-use smol::fs::File;
+use std::io;
 use std::path::PathBuf;
+use tokio::fs::DirBuilder;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
@@ -14,24 +16,29 @@ pub struct Config {
     pub channel_id: Option<ChannelId>,
 }
 
-async fn load(config_path: PathBuf) -> Result<Config, anyhow::Error> {
-    let config_str = smol::fs::read_to_string(config_path).await?;
-    Ok(toml::from_str(&config_str)?)
+// Private methods for async reading and writing of config files
+async fn load(config_path: PathBuf) -> io::Result<Config> {
+    let config_str = tokio::fs::read_to_string(config_path).await?;
+    toml::from_str(&config_str).map_err(io::Error::other)
 }
 
-async fn save(config_path: PathBuf, config: Config) -> Result<(), anyhow::Error> {
+async fn save(config_path: PathBuf, config: Config) -> io::Result<()> {
     let mut config_file = File::create(&config_path).await?;
-    let config_str = toml::to_string(&config)?;
+    let config_str = toml::to_string(&config).map_err(io::Error::other)?;
     config_file.write_all(config_str.as_bytes()).await?;
-    Ok(config_file.sync_all().await?)
+    config_file.sync_all().await
 }
 
-async fn create(config_path: PathBuf) -> Result<(), anyhow::Error> {
-    smol::fs::create_dir_all(config_path.parent().unwrap()).await?;
+async fn create(config_path: PathBuf) -> io::Result<()> {
+    DirBuilder::new()
+        .recursive(true)
+        .create(config_path.parent().unwrap())
+        .await?;
     let config_file = File::create(&config_path).await?;
-    Ok(config_file.sync_all().await?)
+    config_file.sync_all().await
 }
 
+/// Use `save_config` to save the config to disk from the UI
 pub fn save_config(config: Config) -> Task<Message> {
     if let Some(proj_dirs) = ProjectDirs::from("net", "Mackenzie Serres", "meshchat") {
         let config_path = proj_dirs.config_dir().join("config.toml");
@@ -47,6 +54,7 @@ pub fn save_config(config: Config) -> Task<Message> {
     }
 }
 
+/// Use `load_config` to load the config from disk from the UI
 pub fn load_config() -> Task<Message> {
     if let Some(proj_dirs) = ProjectDirs::from("net", "Mackenzie Serres", "meshchat") {
         let config_path = proj_dirs.config_dir().join("config.toml");

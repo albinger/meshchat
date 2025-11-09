@@ -1,48 +1,28 @@
 use iced::Point;
+use std::sync::OnceLock;
 
 use lyon_algorithms::measure::PathMeasurements;
 use lyon_algorithms::path::{builder::NoAttributes, path::BuilderImpl, Path};
-use once_cell::sync::Lazy;
 
-/*
-pub static EMPHASIZED: Lazy<Easing> = Lazy::new(|| {
-    Easing::builder()
-        .cubic_bezier_to([0.05, 0.0], [0.133333, 0.06], [0.166666, 0.4])
-        .cubic_bezier_to([0.208333, 0.82], [0.25, 1.0], [1.0, 1.0])
-        .build()
-});
+pub static STANDARD: OnceLock<Easing> = OnceLock::new();
 
-pub static EMPHASIZED_DECELERATE: Lazy<Easing> = Lazy::new(|| {
-    Easing::builder()
-        .cubic_bezier_to([0.05, 0.7], [0.1, 1.0], [1.0, 1.0])
-        .build()
-});
+pub fn standard() -> &'static Easing {
+    STANDARD.get_or_init(|| {
+        Easing::builder()
+            .cubic_bezier_to([0.2, 0.0], [0.0, 1.0], [1.0, 1.0])
+            .build()
+    })
+}
 
+pub static EMPHASIZED_ACCELERATE: OnceLock<Easing> = OnceLock::new();
 
-pub static STANDARD_DECELERATE: Lazy<Easing> = Lazy::new(|| {
-    Easing::builder()
-        .cubic_bezier_to([0.0, 0.0], [0.0, 1.0], [1.0, 1.0])
-        .build()
-});
-
-pub static STANDARD_ACCELERATE: Lazy<Easing> = Lazy::new(|| {
-    Easing::builder()
-        .cubic_bezier_to([0.3, 0.0], [1.0, 1.0], [1.0, 1.0])
-        .build()
-});
-*/
-
-pub static STANDARD: Lazy<Easing> = Lazy::new(|| {
-    Easing::builder()
-        .cubic_bezier_to([0.2, 0.0], [0.0, 1.0], [1.0, 1.0])
-        .build()
-});
-
-pub static EMPHASIZED_ACCELERATE: Lazy<Easing> = Lazy::new(|| {
-    Easing::builder()
-        .cubic_bezier_to([0.3, 0.0], [0.8, 0.15], [1.0, 1.0])
-        .build()
-});
+pub fn emphasized_accelerate() -> &'static Easing {
+    EMPHASIZED_ACCELERATE.get_or_init(|| {
+        Easing::builder()
+            .cubic_bezier_to([0.3, 0.0], [0.8, 0.15], [1.0, 1.0])
+            .build()
+    })
+}
 
 pub struct Easing {
     path: Path,

@@ -174,7 +174,7 @@ impl MeshChat {
         if busy {
             outer = outer.push(
                 Linear::new()
-                    .easing(&easing::EMPHASIZED_ACCELERATE)
+                    .easing(easing::emphasized_accelerate())
                     .cycle_duration(Duration::from_secs_f32(2.0))
                     .width(iced::Length::Fill),
             );

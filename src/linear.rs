@@ -36,7 +36,7 @@ where
             width: Length::Fixed(100.0),
             height: Length::Fixed(4.0),
             style: Theme::Style::default(),
-            easing: &easing::STANDARD,
+            easing: easing::standard(),
             cycle_duration: Duration::from_millis(500),
         }
     }

@@ -5,10 +5,10 @@ use crate::device_subscription::SubscriptionEvent::{
     ConnectedEvent, ConnectionError, DevicePacket, DisconnectedEvent, MessageSent,
 };
 use crate::name_from_id;
-use anyhow::Context;
 use futures::SinkExt;
 use iced::stream;
 use meshtastic::api::{ConnectedStreamApi, StreamApi};
+use meshtastic::errors::Error;
 use meshtastic::packet::PacketReceiver;
 use meshtastic::protobufs::from_radio::PayloadVariant::{
     Channel, ClientNotification, MyInfo, NodeInfo, Packet,
@@ -164,9 +164,7 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
     })
 }
 
-async fn do_connect(
-    device: &BleDevice,
-) -> Result<(PacketReceiver, ConnectedStreamApi), anyhow::Error> {
+async fn do_connect(device: &BleDevice) -> Result<(PacketReceiver, ConnectedStreamApi), Error> {
     let ble_stream =
         utils::stream::build_ble_stream(&device.mac_address.into(), Duration::from_secs(4)).await?;
     let stream_api = StreamApi::new();
@@ -176,10 +174,6 @@ async fn do_connect(
     Ok((packet_receiver, stream_api))
 }
 
-async fn do_disconnect(stream_api: ConnectedStreamApi) -> Result<(), anyhow::Error> {
-    stream_api
-        .disconnect()
-        .await
-        .context("Failed to disconnect")?;
-    Ok(())
+async fn do_disconnect(stream_api: ConnectedStreamApi) -> Result<StreamApi, Error> {
+    stream_api.disconnect().await
 }
