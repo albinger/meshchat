@@ -6,7 +6,9 @@ readme = "README.md"
 repository = "https://github.com/andrewdavidmackenzie/meshchat"
 
 [dependencies]
+# For communications with BLE connected radios running meshtastic firmware
 meshtastic = { version = "0.1.7", git = "https://github.com/meshtastic/rust.git", default-features = false, features = ["serde", "tokio", "bluetooth-le"] }
+# GUI framework
 iced = { version = "0.13.1", features = ["tokio", "advanced", "canvas"] }
 iced_futures = { version = "0.13", default-features = false }
 # for saving config files in platform dependent directories
@@ -21,6 +23,7 @@ futures = { version = "0.3.31", default-features = false }
 tokio-stream = { version = "0.1.17", default-features = false }
 # For receiving messages from UI in device_subscription.rs
 async-stream = { version = "0.3.6", default-features = false }
+# For mpsc sender/receiver and async file IO
 tokio = { version = "1.47.1", default-features = false }
 # For ordering messages in ChannelView
 sorted-vec = { version = "0.8.10", default-features = false }
