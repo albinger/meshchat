@@ -1,19 +1,20 @@
 use crate::channel_view::ChannelId;
 use crate::device_subscription::DeviceState::{Connected, Disconnected};
-use crate::device_subscription::SubscriberMessage::{Connect, Disconnect, Radio, SendText};
+use crate::device_subscription::SubscriberMessage::{Connect, Disconnect, RadioPacket, SendText};
 use crate::device_subscription::SubscriptionEvent::{
-    ConnectedEvent, ConnectionError, DevicePacket, DisconnectedEvent, MessageSent,
+    ConnectedEvent, ConnectionError, DeviceMeshPacket, DevicePacket, DisconnectedEvent, MessageSent,
 };
 use crate::name_from_id;
 use futures::SinkExt;
 use iced::stream;
 use meshtastic::api::{ConnectedStreamApi, StreamApi};
 use meshtastic::errors::Error;
-use meshtastic::packet::PacketReceiver;
+use meshtastic::packet::{PacketDestination, PacketReceiver, PacketRouter};
 use meshtastic::protobufs::from_radio::PayloadVariant::{
     Channel, ClientNotification, MyInfo, NodeInfo, Packet,
 };
-use meshtastic::protobufs::FromRadio;
+use meshtastic::protobufs::{FromRadio, MeshPacket};
+use meshtastic::types::{MeshChannel, NodeId};
 use meshtastic::utils;
 use meshtastic::utils::stream::BleDevice;
 use std::pin::Pin;
@@ -29,7 +30,8 @@ pub enum SubscriptionEvent {
     ConnectedEvent(BleDevice),
     DisconnectedEvent(BleDevice),
     DevicePacket(Box<FromRadio>),
-    MessageSent(ChannelId), // Maybe add type for when we send emojis or something else
+    DeviceMeshPacket(Box<MeshPacket>),
+    MessageSent(String, ChannelId), // Maybe add type for when we send emojis or something else
     ConnectionError(BleDevice, String, String),
 }
 
@@ -38,12 +40,57 @@ pub enum SubscriberMessage {
     Connect(BleDevice),
     Disconnect,
     SendText(String, ChannelId),
-    Radio(Box<FromRadio>),
+    RadioPacket(Box<FromRadio>),
 }
 
 enum DeviceState {
     Disconnected,
     Connected(BleDevice, PacketReceiver),
+}
+
+struct MyRouter {
+    gui_sender: futures_channel::mpsc::Sender<SubscriptionEvent>,
+    my_node_num: Option<u32>,
+}
+
+impl MyRouter {
+    /// Handle [FromRadio] packets received from the radio, filter down to packets we know the App/Gui
+    /// is interested in and forward those to the Gui using the provided `gui_sender`
+    fn handle_from_radio(&mut self, packet: Box<FromRadio>) -> Result<(), Error> {
+        let payload_variant = packet.payload_variant.as_ref().unwrap();
+        // Filter to only send packets UI is interested in
+        if matches!(
+            payload_variant,
+            Packet(_) | MyInfo(_) | NodeInfo(_) | Channel(_) | ClientNotification(_)
+        ) {
+            if let MyInfo(my_info) = &payload_variant {
+                self.my_node_num = Some(my_info.my_node_num);
+            }
+
+            self.gui_sender
+                .try_send(DevicePacket(packet))
+                .unwrap_or_else(|e| eprintln!("Send error: {e}"));
+        }
+
+        Ok(())
+    }
+}
+
+impl PacketRouter<(), Error> for MyRouter {
+    fn handle_packet_from_radio(&mut self, packet: FromRadio) -> Result<(), Error> {
+        self.handle_from_radio(Box::new(packet))
+    }
+
+    fn handle_mesh_packet(&mut self, packet: MeshPacket) -> Result<(), Error> {
+        self.gui_sender
+            .try_send(DeviceMeshPacket(Box::new(packet)))
+            .unwrap_or_else(|e| eprintln!("Send error: {e}"));
+        Ok(())
+    }
+
+    fn source_node_id(&self) -> NodeId {
+        NodeId::from(self.my_node_num.unwrap_or(0))
+    }
 }
 
 /// A stream of [DeviceViewMessage] announcing the discovery or loss of devices via BLE
@@ -99,8 +146,13 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
                     }
                 }
                 Connected(id, packet_receiver) => {
+                    let mut my_router = MyRouter {
+                        gui_sender: gui_sender.clone(),
+                        my_node_num: None,
+                    };
+
                     let radio_stream = UnboundedReceiverStream::from(packet_receiver)
-                        .map(|fr| Radio(Box::new(fr)));
+                        .map(|fr| RadioPacket(Box::new(fr)));
 
                     let mut merged_stream = radio_stream.merge(&mut subscriber_receiver);
 
@@ -108,45 +160,41 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
                         match message {
                             Connect(_) => eprintln!("Already connected!"),
                             Disconnect => break,
-                            SendText(text, channel_index) => {
-                                println!("SendText '{text}' to channel: {channel_index}");
+                            SendText(text, channel_id) => {
                                 // TODO handle send errors and report to UI
-                                let api = stream_api.take().unwrap();
-                                /*
-                                let _ = api
-                                    .send_text(
-                                        &mut router,
-                                        text,
-                                        PacketDestination::Broadcast,
-                                        true,
-                                        MeshChannel::from(channel_number as u32),
-                                    )
-                                    .await;
-                                 */
-                                gui_sender
-                                    .send(MessageSent(channel_index))
-                                    .await
-                                    .unwrap_or_else(|e| eprintln!("Send error: {e}"));
+                                let mut api = stream_api.take().unwrap();
+                                match channel_id {
+                                    ChannelId::Channel(channel_number) => {
+                                        let _ = api
+                                            .send_text(
+                                                &mut my_router,
+                                                text,
+                                                PacketDestination::Broadcast,
+                                                true,
+                                                MeshChannel::from(channel_number as u32),
+                                            )
+                                            .await;
+                                    }
+                                    ChannelId::Node(node_id) => {
+                                        let _ = api
+                                            .send_text(
+                                                &mut my_router,
+                                                text.clone(),
+                                                PacketDestination::Node(NodeId::from(node_id)),
+                                                true,
+                                                MeshChannel::default(),
+                                            )
+                                            .await;
 
+                                        gui_sender
+                                            .send(MessageSent(text, channel_id))
+                                            .await
+                                            .unwrap_or_else(|e| eprintln!("Send error: {e}"));
+                                    }
+                                }
                                 let _none = stream_api.replace(api);
                             }
-                            Radio(packet) => {
-                                let payload_variant = packet.payload_variant.as_ref().unwrap();
-                                // Filter to only send packets UI is interested in
-                                if matches!(
-                                    payload_variant,
-                                    Packet(_)
-                                        | MyInfo(_)
-                                        | NodeInfo(_)
-                                        | Channel(_)
-                                        | ClientNotification(_)
-                                ) {
-                                    gui_sender
-                                        .send(DevicePacket(packet))
-                                        .await
-                                        .unwrap_or_else(|e| eprintln!("Send error: {e}"));
-                                }
-                            }
+                            RadioPacket(packet) => my_router.handle_from_radio(packet).unwrap(),
                         }
                     }
 

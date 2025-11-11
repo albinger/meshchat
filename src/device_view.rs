@@ -4,7 +4,8 @@ use crate::channel_view::{ChannelId, ChannelView, ChannelViewMessage};
 use crate::config::Config;
 use crate::device_subscription::SubscriberMessage::{Connect, Disconnect, SendText};
 use crate::device_subscription::SubscriptionEvent::{
-    ConnectedEvent, ConnectionError, DevicePacket, DisconnectedEvent, MessageSent, Ready,
+    ConnectedEvent, ConnectionError, DeviceMeshPacket, DevicePacket, DisconnectedEvent,
+    MessageSent, Ready,
 };
 use crate::device_subscription::{SubscriberMessage, SubscriptionEvent};
 use crate::device_view::ConnectionState::{Connected, Connecting, Disconnected, Disconnecting};
@@ -198,9 +199,10 @@ impl DeviceView {
                     Task::none()
                 }
                 DevicePacket(packet) => self.handle_from_radio(packet),
-                MessageSent(channel_index) => {
-                    if let Some(channel_view) = self.channel_views.get_mut(&channel_index) {
-                        channel_view.message_sent();
+                DeviceMeshPacket(packet) => self.handle_mesh_packet(&packet),
+                MessageSent(msg_test, channel_id) => {
+                    if let Some(channel_view) = self.channel_views.get_mut(&channel_id) {
+                        channel_view.message_sent(msg_test);
                     }
                     Task::none()
                 }
@@ -237,7 +239,9 @@ impl DeviceView {
     /// Handle [FromRadio] packets coming from the radio, forwarded from the device_subscription
     fn handle_from_radio(&mut self, packet: Box<FromRadio>) -> Task<Message> {
         match packet.payload_variant {
-            Some(PayloadVariant::Packet(mesh_packet)) => self.handle_mesh_packet(mesh_packet),
+            Some(PayloadVariant::Packet(mesh_packet)) => {
+                return self.handle_mesh_packet(&mesh_packet);
+            }
             Some(PayloadVariant::MyInfo(my_node_info)) => {
                 self.my_node_num = Some(my_node_info.my_node_num);
             }
@@ -300,7 +304,7 @@ impl DeviceView {
         }
     }
 
-    fn handle_mesh_packet(&mut self, mesh_packet: MeshPacket) {
+    fn handle_mesh_packet(&mut self, mesh_packet: &MeshPacket) -> Task<Message> {
         if let Some(Decoded(data)) = &mesh_packet.payload_variant {
             match PortNum::try_from(data.portnum) {
                 Ok(PortNum::AlertApp) | Ok(PortNum::TextMessageApp) => {
@@ -309,9 +313,15 @@ impl DeviceView {
                         .map(|t| t.as_secs())
                         .unwrap_or(0);
 
-                    let channel_id = ChannelId::Channel(mesh_packet.channel as i32);
-                    let seen = self.viewing_channel == Some(channel_id.clone());
+                    let channel_id = if mesh_packet.to == u32::MAX {
+                        // Destined for a channel
+                        ChannelId::Channel(mesh_packet.channel as i32)
+                    } else {
+                        ChannelId::Node(mesh_packet.from)
+                    };
+
                     if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
+                        let seen = self.viewing_channel == Some(channel_id.clone());
                         let new_message = ChannelMessage {
                             message: Text(String::from_utf8(data.payload.clone()).unwrap()),
                             from: mesh_packet.from,
@@ -379,6 +389,8 @@ impl DeviceView {
                 _ => eprintln!("Unexpected payload type from radio: {}", data.portnum),
             }
         }
+
+        Task::none()
     }
 
     pub fn header<'a>(&'a self, connection_state: &'a ConnectionState) -> Element<'a, Message> {

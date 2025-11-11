@@ -1,7 +1,7 @@
 use crate::channel_message::ChannelMsg::{Ping, Position, Text};
 use crate::channel_view::ChannelId::Channel;
 use crate::channel_view::ChannelViewMessage::{ClearMessage, MessageInput};
-use crate::device_view::DeviceViewMessage::{ChannelMsg, SendMessage};
+use crate::device_view::DeviceViewMessage::ChannelMsg;
 use crate::styles::{text_input_style, MY_MESSAGE_STYLE, OTHERS_MESSAGE_STYLE};
 use crate::{channel_message::ChannelMessage, Message};
 use iced::widget::scrollable::Scrollbar;
@@ -16,6 +16,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub enum ChannelViewMessage {
     MessageInput(String),
     ClearMessage,
+    SendMessage,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
@@ -45,6 +46,8 @@ pub struct ChannelView {
     my_source: u32,
 }
 
+async fn empty() {}
+
 // A view of a single channel and it's message, which maybe a real radio "Channel" or a chat channel
 // with a specific [meshtastic:User]
 impl ChannelView {
@@ -57,15 +60,15 @@ impl ChannelView {
         }
     }
 
-    pub fn message_sent(&mut self) {
+    /// WHen a message was sent, add it to the list of messages to display with the current time
+    pub fn message_sent(&mut self, msg_text: String) {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|t| t.as_secs())
             .unwrap_or(0);
 
-        // TODO Mark as sent in the UI, and clear the message entry
         self.messages.push(ChannelMessage {
-            message: Text(self.message.clone()),
+            message: Text(msg_text),
             from: self.my_source,
             rx_time: now, // time in epoc
             seen: true,
@@ -89,8 +92,20 @@ impl ChannelView {
                 Task::none()
             }
             ClearMessage => {
+                // TODO add a button to clear message entered so far
                 self.message = String::new();
                 Task::none()
+            }
+            ChannelViewMessage::SendMessage => {
+                let msg = self.message.clone();
+                self.message = String::new();
+                let channel_id = self.channel_id.clone();
+                Task::perform(empty(), move |_| {
+                    Message::Device(crate::device_view::DeviceViewMessage::SendMessage(
+                        msg.clone(),
+                        channel_id.clone(),
+                    ))
+                })
             }
         }
     }
@@ -157,10 +172,7 @@ impl ChannelView {
         text_input("Send Message", &self.message)
             .style(text_input_style)
             .on_input(|s| Message::Device(ChannelMsg(MessageInput(s))))
-            .on_submit(Message::Device(SendMessage(
-                self.message.clone(),
-                self.channel_id.clone(),
-            )))
+            .on_submit(Message::Device(ChannelMsg(ChannelViewMessage::SendMessage)))
             .padding([6, 6])
             .into()
     }
