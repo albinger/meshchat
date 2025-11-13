@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Serialize, Deserialize)]
 pub enum ChannelMsg {
@@ -8,14 +9,41 @@ pub enum ChannelMsg {
     Ping(String), // Could add hw_model or similar if wanted
 }
 
-// A text message to this user on this device, sent from another device
+/// A Message to this user on this device or to a channel this device can read. Can be any of
+/// [ChannelMsg] types. Sent from another device.
 #[derive(Serialize, Deserialize)]
 pub struct ChannelMessage {
-    // TODO see if we can/should make some of these private with methods
-    pub from: u32,
-    pub rx_time: u64,
-    pub message: ChannelMsg,
-    pub seen: bool,
+    from: u32,
+    rx_time: u64,
+    payload: ChannelMsg,
+    seen: bool,
+}
+
+impl ChannelMessage {
+    /// Create a new [ChannelMessage] from the parameters provided. The received time will be set to
+    /// the current time in EPOC as an u64
+    pub fn new(message: ChannelMsg, from: u32, seen: bool) -> Self {
+        let rx_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|t| t.as_secs())
+            .unwrap_or(0);
+
+        ChannelMessage {
+            payload: message,
+            from,
+            rx_time,
+            seen,
+        }
+    }
+
+    /// Get a reference to the payload of this message
+    pub fn payload(&self) -> &ChannelMsg {
+        &self.payload
+    }
+
+    pub fn from(&self) -> u32 {
+        self.from
+    }
 }
 
 impl PartialEq<Self> for ChannelMessage {

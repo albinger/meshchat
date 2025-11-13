@@ -10,7 +10,6 @@ use iced::{Element, Fill, Left, Right, Task, Theme};
 use serde::{Deserialize, Serialize};
 use sorted_vec::SortedVec;
 use std::fmt::{Display, Formatter};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone)]
 pub enum ChannelViewMessage {
@@ -62,17 +61,8 @@ impl ChannelView {
 
     /// WHen a message was sent, add it to the list of messages to display with the current time
     pub fn message_sent(&mut self, msg_text: String) {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|t| t.as_secs())
-            .unwrap_or(0);
-
-        self.messages.push(ChannelMessage {
-            message: Text(msg_text),
-            from: self.my_source,
-            rx_time: now, // time in epoc
-            seen: true,
-        });
+        self.messages
+            .push(ChannelMessage::new(Text(msg_text), self.my_source, true));
         // Until we have a queue of messages being sent pending confirmation
         self.message = String::new();
     }
@@ -115,11 +105,11 @@ impl ChannelView {
         let mut channel_view = Column::new();
 
         for message in &self.messages {
-            match &message.message {
+            match message.payload() {
                 Text(text_msg) => {
                     channel_view = channel_view.push(message_box(
                         text_msg.clone(),
-                        message.from == self.my_source,
+                        message.from() == self.my_source,
                     ));
                 }
                 Position(lat, long) => {
@@ -127,13 +117,13 @@ impl ChannelView {
                     let longitude = 0.0000001 * *long as f64;
                     channel_view = channel_view.push(message_box(
                         format!("({}, {})", latitude, longitude),
-                        message.from == self.my_source,
+                        message.from() == self.my_source,
                     ));
                 }
                 Ping(short_name) => {
                     channel_view = channel_view.push(message_box(
                         format!("Ping from user '{}'", short_name),
-                        message.from == self.my_source,
+                        message.from() == self.my_source,
                     ));
                 }
             }
@@ -178,8 +168,8 @@ impl ChannelView {
     }
 }
 
-fn message_box(msg: String, me: bool) -> Element<'static, Message> {
-    let style = if me {
+fn message_box(msg: String, mine: bool) -> Element<'static, Message> {
+    let style = if mine {
         MY_MESSAGE_STYLE
     } else {
         OTHERS_MESSAGE_STYLE
@@ -194,7 +184,7 @@ fn message_box(msg: String, me: bool) -> Element<'static, Message> {
     .style(move |_theme: &Theme| style);
 
     let mut row = Row::new().padding([6, 6]);
-    if me {
+    if mine {
         row = row.push(Space::new(100.0, 1.0)).push(bubble);
         let col = Column::new().width(Fill).align_x(Right);
         col.push(row).into()
