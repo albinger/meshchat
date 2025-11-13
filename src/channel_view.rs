@@ -1,9 +1,9 @@
-use crate::channel_message::Payload::{Ping, Position, Text};
 use crate::channel_view::ChannelId::Channel;
 use crate::channel_view::ChannelViewMessage::{ClearMessage, MessageInput};
+use crate::channel_view_entry::Payload::{Ping, Position, Text};
 use crate::device_view::DeviceViewMessage::ChannelMsg;
 use crate::styles::{text_input_style, MY_MESSAGE_STYLE, OTHERS_MESSAGE_STYLE};
-use crate::{channel_message::ChannelViewEntry, Message};
+use crate::{channel_view_entry::ChannelViewEntry, Message};
 use iced::widget::scrollable::Scrollbar;
 use iced::widget::{scrollable, text, text_input, Column, Container, Row, Space};
 use iced::{Element, Fill, Left, Right, Task, Theme};

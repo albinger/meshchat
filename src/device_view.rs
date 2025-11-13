@@ -1,6 +1,6 @@
-use crate::channel_message::ChannelViewEntry;
-use crate::channel_message::Payload::{Ping, Position, Text};
 use crate::channel_view::{ChannelId, ChannelView, ChannelViewMessage};
+use crate::channel_view_entry::ChannelViewEntry;
+use crate::channel_view_entry::Payload::{Ping, Position, Text};
 use crate::config::Config;
 use crate::device_subscription::SubscriberMessage::{Connect, Disconnect, SendText};
 use crate::device_subscription::SubscriptionEvent::{
