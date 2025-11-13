@@ -41,8 +41,9 @@ impl ChannelViewEntry {
         &self.payload
     }
 
-    pub fn from(&self) -> u32 {
-        self.from
+    /// Return true if this message was sent from the specified node id
+    pub fn source_node(&self, node_id: u32) -> bool {
+        self.from == node_id
     }
 }
 

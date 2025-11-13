@@ -109,7 +109,7 @@ impl ChannelView {
                 Text(text_msg) => {
                     channel_view = channel_view.push(message_box(
                         text_msg.clone(),
-                        message.from() == self.my_source,
+                        message.source_node(self.my_source),
                     ));
                 }
                 Position(lat, long) => {
@@ -117,13 +117,13 @@ impl ChannelView {
                     let longitude = 0.0000001 * *long as f64;
                     channel_view = channel_view.push(message_box(
                         format!("({}, {})", latitude, longitude),
-                        message.from() == self.my_source,
+                        message.source_node(self.my_source),
                     ));
                 }
                 Ping(short_name) => {
                     channel_view = channel_view.push(message_box(
                         format!("Ping from user '{}'", short_name),
-                        message.from() == self.my_source,
+                        message.source_node(self.my_source),
                     ));
                 }
             }
