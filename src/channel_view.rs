@@ -8,7 +8,7 @@ use crate::styles::{
 };
 use crate::{channel_view_entry::ChannelViewEntry, Message};
 use chrono::prelude::DateTime;
-use chrono::Utc;
+use chrono::{Local, Utc};
 use iced::widget::scrollable::Scrollbar;
 use iced::widget::{scrollable, text, text_input, Column, Container, Row, Space, Text};
 use iced::Length::Fixed;
@@ -205,8 +205,9 @@ impl ChannelView {
     /// Format a time as seconds in epoc (u64) into a String of hour and minutes during the day
     /// it occurs in. These will be separated by Day specifiers, so day is not needed.
     fn time_to_text(time: u64) -> Text<'static, Theme, Renderer> {
-        let datetime = DateTime::<Utc>::from_timestamp_secs(time as i64).unwrap();
-        let time_str = datetime.naive_local().format("%H:%M").to_string(); // Formats as HH:MM
+        let datetime_utc = DateTime::<Utc>::from_timestamp_secs(time as i64).unwrap();
+        let datetime_local = datetime_utc.with_timezone(&Local);
+        let time_str = datetime_local.format("%H:%M").to_string(); // Formats as HH:MM
         text(time_str)
             .color(TIME_TEXT_COLOR)
             .size(TIME_TEXT_SIZE)
