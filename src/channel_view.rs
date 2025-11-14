@@ -144,10 +144,28 @@ impl ChannelView {
     }
 
     /// Return an Element that displays a day separator
+    /// "%Y" - Year . e.g. "2021"
+    /// "%b" - Three letter month name e.g. "Jul"
+    /// "%e" - space padded date e.g. " 8" for the 8th day of the month
+    /// "%A" - day name e.g. "Friday"
     fn day_separator(datetime_local: &DateTime<Local>) -> Element<'static, Message> {
+        let now_local = Local::now();
+        let format_string = if datetime_local.iso_week() < now_local.iso_week() {
+            if datetime_local.year() != now_local.year() {
+                // before the beginning of year week, so how the day name, month name and date
+                "%A, %b %e, %Y"
+            } else {
+                // before the beginning of this week, so how the day name, month name and date
+                "%A, %b %e"
+            }
+        } else {
+            // Same week, so just show the day name
+            "%A"
+        };
+
         Column::new()
             .push(
-                Container::new(text(datetime_local.format("%A").to_string()).size(16))
+                Container::new(text(datetime_local.format(format_string).to_string()).size(16))
                     .align_x(Center)
                     .padding(6)
                     .style(|_| DAY_SEPARATOR_STYLE),
