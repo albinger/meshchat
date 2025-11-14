@@ -3,16 +3,16 @@ use crate::channel_view::ChannelViewMessage::{ClearMessage, MessageInput};
 use crate::channel_view_entry::Payload::{Ping, Position, TextMessage};
 use crate::device_view::DeviceViewMessage::ChannelMsg;
 use crate::styles::{
-    text_input_style, MESSAGE_TEXT_STYLE, MY_MESSAGE_BUBBLE_STYLE, OTHERS_MESSAGE_BUBBLE_STYLE,
-    TIME_TEXT_COLOR, TIME_TEXT_SIZE, TIME_TEXT_WIDTH,
+    text_input_style, DAY_SEPARATOR_STYLE, MESSAGE_TEXT_STYLE, MY_MESSAGE_BUBBLE_STYLE,
+    OTHERS_MESSAGE_BUBBLE_STYLE, TIME_TEXT_COLOR, TIME_TEXT_SIZE, TIME_TEXT_WIDTH,
 };
 use crate::{channel_view_entry::ChannelViewEntry, Message};
 use chrono::prelude::DateTime;
-use chrono::{Local, Utc};
+use chrono::{Datelike, Local, Utc};
 use iced::widget::scrollable::Scrollbar;
 use iced::widget::{scrollable, text, text_input, Column, Container, Row, Space, Text};
 use iced::Length::Fixed;
-use iced::{Bottom, Element, Fill, Left, Renderer, Right, Task, Theme};
+use iced::{Bottom, Center, Element, Fill, Left, Renderer, Right, Task, Theme};
 use serde::{Deserialize, Serialize};
 use sorted_vec::SortedVec;
 use std::fmt::{Display, Formatter};
@@ -113,7 +113,18 @@ impl ChannelView {
     pub fn view(&self) -> Element<'static, Message> {
         let mut channel_view = Column::new();
 
+        let mut previous_day = u32::MIN;
+
         for message in &self.entries {
+            let datetime_utc = DateTime::<Utc>::from_timestamp_secs(message.time() as i64).unwrap();
+            let datetime_local = datetime_utc.with_timezone(&Local);
+            let message_day = datetime_local.day();
+
+            if message_day != previous_day {
+                channel_view = channel_view.push(Self::day_separator(&datetime_local));
+                previous_day = message_day;
+            }
+
             channel_view = channel_view.push(self.message_box(message));
         }
 
@@ -129,6 +140,43 @@ impl ChannelView {
             .padding(4)
             .push(channel_scroll)
             .push(self.input_box())
+            .into()
+    }
+
+    /// Return an Element that displays a day separator
+    /// If in the same week, then just the day name "Friday"
+    /// If in a previous week, of the same year, then "Friday, Jul 8"
+    /// If in a previous year, then "Friday, Jul 8, 2021"
+    ///
+    /// Meaning of format strings used
+    /// "%Y" - Year . e.g. "2021"
+    /// "%b" - Three letter month name e.g. "Jul"
+    /// "%e" - space padded date e.g. " 8" for the 8th day of the month
+    /// "%A" - day name e.g. "Friday"
+    fn day_separator(datetime_local: &DateTime<Local>) -> Element<'static, Message> {
+        let now_local = Local::now();
+        let format_string = if datetime_local.iso_week() < now_local.iso_week() {
+            if datetime_local.year() != now_local.year() {
+                // before the beginning of year week, so how the day name, month name and date
+                "%A, %b %e, %Y"
+            } else {
+                // before the beginning of this week, so how the day name, month name and date
+                "%A, %b %e"
+            }
+        } else {
+            // Same week, so just show the day name
+            "%A"
+        };
+
+        Column::new()
+            .push(
+                Container::new(text(datetime_local.format(format_string).to_string()).size(16))
+                    .align_x(Center)
+                    .padding(6)
+                    .style(|_| DAY_SEPARATOR_STYLE),
+            )
+            .width(Fill)
+            .align_x(Center)
             .into()
     }
 
@@ -155,6 +203,7 @@ impl ChannelView {
             .into()
     }
 
+    /// Create an Element that contains a message received or sent
     fn message_box(&self, message: &ChannelViewEntry) -> Element<'static, Message> {
         let style = if message.source_node(self.my_source) {
             MY_MESSAGE_BUBBLE_STYLE
