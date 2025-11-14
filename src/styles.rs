@@ -163,6 +163,13 @@ pub const MY_MESSAGE_BUBBLE_STYLE: Style = Style {
     shadow: NO_SHADOW,
 };
 
+pub const DAY_SEPARATOR_STYLE: Style = Style {
+    text_color: Some(Color::WHITE),
+    background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 1.0))),
+    border: MESSAGE_BORDER,
+    shadow: NO_SHADOW,
+};
+
 pub const OTHERS_MESSAGE_BUBBLE_STYLE: Style = Style {
     text_color: Some(Color::WHITE),
     background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 1.0))),
