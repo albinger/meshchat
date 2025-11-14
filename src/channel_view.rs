@@ -237,7 +237,7 @@ impl ChannelView {
             col = col.push(tooltip(
                 container(
                     text(name.clone())
-                        .color(Self::color_from_name(&name))
+                        .color(Self::color_from_name(name))
                         .font(Font {
                             weight: Weight::Bold,
                             ..Default::default()

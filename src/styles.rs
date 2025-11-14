@@ -1,3 +1,5 @@
+#![allow(dead_code)] // for extra colors we have generated but not used yet
+
 use iced::border::Radius;
 use iced::widget::container::Style;
 use iced::widget::{button, text, text_input};
