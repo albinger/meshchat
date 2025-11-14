@@ -12,7 +12,7 @@ use chrono::{Datelike, Local, Utc};
 use iced::widget::scrollable::Scrollbar;
 use iced::widget::{scrollable, text, text_input, Column, Container, Row, Space, Text};
 use iced::Length::Fixed;
-use iced::{Bottom, Center, Element, Fill, Left, Renderer, Right, Task, Theme};
+use iced::{Bottom, Center, Element, Fill, Left, Padding, Renderer, Right, Task, Theme};
 use serde::{Deserialize, Serialize};
 use sorted_vec::SortedVec;
 use std::fmt::{Display, Formatter};
@@ -172,7 +172,7 @@ impl ChannelView {
             .push(
                 Container::new(text(datetime_local.format(format_string).to_string()).size(16))
                     .align_x(Center)
-                    .padding(6)
+                    .padding(Padding::from([6, 12]))
                     .style(|_| DAY_SEPARATOR_STYLE),
             )
             .width(Fill)
@@ -205,7 +205,8 @@ impl ChannelView {
 
     /// Create an Element that contains a message received or sent
     fn message_box(&self, message: &ChannelViewEntry) -> Element<'static, Message> {
-        let style = if message.source_node(self.my_source) {
+        let mine = message.source_node(self.my_source);
+        let style = if mine {
             MY_MESSAGE_BUBBLE_STYLE
         } else {
             OTHERS_MESSAGE_BUBBLE_STYLE
@@ -238,8 +239,8 @@ impl ChannelView {
         .style(move |_theme: &Theme| style);
 
         let mut row = Row::new().padding([6, 6]);
-        // Put on the right hand side if my message, on the left if from someone else
-        if message.source_node(self.my_source) {
+        // Put on the right-hand side if my message, on the left if from someone else
+        if mine {
             // Avoid very wide messages from me extending all the way to the left edge of the screen
             row = row.push(Space::with_width(100.0)).push(bubble);
             Column::new().width(Fill).align_x(Right).push(row).into()
