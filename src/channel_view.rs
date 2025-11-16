@@ -264,7 +264,7 @@ impl ChannelView {
                     .align_y(Bottom),
             ),
         )
-        .padding([6, 12])
+        .padding([6, 8])
         .style(move |_theme: &Theme| style);
 
         let mut row = Row::new().padding([6, 6]);
