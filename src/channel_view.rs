@@ -90,20 +90,20 @@ impl ChannelView {
         self.entries = SortedVec::from_unsorted(entries_vec);
     }
 
-    fn add_emoji_to(&mut self, request_id: u32, emoji_string: String) {
+    fn add_emoji_to(&mut self, request_id: u32, emoji_string: String, source_name: String) {
         // Convert to Vec to allow mutable access, modify entries, then rebuild SortedVec
         let mut entries_vec: Vec<ChannelViewEntry> =
             mem::take(&mut self.entries).into_iter().collect();
         for entry in entries_vec.iter_mut() {
             if entry.message_id() == request_id {
-                entry.add_emoji(emoji_string);
+                entry.add_emoji(emoji_string, source_name);
                 break;
             }
         }
         self.entries = SortedVec::from_unsorted(entries_vec);
     }
 
-    /// Return the next of a NewTextMessage that matches the given id, or None if not found
+    /// Return the text of a NewTextMessage that matches the given id, or None if not found
     fn text_from_id(&self, id: u32) -> Option<String> {
         for entry in &self.entries {
             if let NewTextMessage(text_message) = entry.payload()
@@ -121,7 +121,11 @@ impl ChannelView {
                 let _ = self.entries.push(new_message);
             }
             EmojiReply(reply_to_id, emoji_string) => {
-                self.add_emoji_to(*reply_to_id, emoji_string.clone())
+                self.add_emoji_to(
+                    *reply_to_id,
+                    emoji_string.clone(),
+                    new_message.name().clone().unwrap(),
+                );
             }
         };
     }
@@ -291,7 +295,7 @@ impl ChannelView {
             ));
         }
 
-        // Add a row the message we are replying to if there is one
+        // Add a row to the message we are replying to if there is one
         if let TextMessageReply(reply_to_id, _) = message.payload()
             && let Some(original_text) = self.text_from_id(*reply_to_id)
         {
@@ -307,7 +311,7 @@ impl ChannelView {
                 text(msg)
                     .style(|_| MESSAGE_TEXT_STYLE)
                     .size(18)
-                    .shaping(text::Shaping::Advanced),
+                    .shaping(Advanced),
             )
             .push(Space::with_width(10.0))
             .push(Self::time_to_text(message.time()))
@@ -343,8 +347,14 @@ impl ChannelView {
         // Add the emoji row outside the bubble, below it
         if !message.emojis().is_empty() {
             let mut emoji_row = Row::new().padding([0, 6]);
-            for emoji in message.emojis() {
-                emoji_row = emoji_row.push(text(emoji.clone()).size(18).shaping(Advanced));
+            // TODO Style the tooltip
+            for (emoji, sources) in message.emojis() {
+                let tooltip_element: Element<'_, Message> = self.list_of_nodes(sources);
+                emoji_row = emoji_row.push(tooltip(
+                    text(emoji.clone()).size(18).shaping(Advanced),
+                    tooltip_element,
+                    tooltip::Position::Bottom,
+                ));
             }
             col = col.push(emoji_row);
         }
@@ -359,6 +369,18 @@ impl ChannelView {
 
         let index = (hash % COLOR_DICTIONARY.len() as u64) as usize;
         COLOR_DICTIONARY[index]
+    }
+
+    fn list_of_nodes(&self, sources: &Vec<String>) -> Element<'static, Message> {
+        let mut col = Column::new();
+        for source in sources {
+            col = col.push(
+                text(source.clone())
+                    .color(Self::color_from_name(source))
+                    .shaping(Advanced),
+            );
+        }
+        col.into()
     }
 
     /// Format a time as seconds in epoc (u64) into a String of hour and minutes during the day

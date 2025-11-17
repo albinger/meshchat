@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -24,7 +25,9 @@ pub struct ChannelViewEntry {
     name: Option<String>,
     seen: bool,
     acked: bool,
-    emoji_reply: Vec<String>,
+    /// Map of emojis and for each emoji there is the string for it and a number of node ides
+    /// who sent that emoji
+    emoji_reply: HashMap<String, Vec<String>>,
 }
 
 impl ChannelViewEntry {
@@ -50,7 +53,7 @@ impl ChannelViewEntry {
             name,
             seen,
             acked: false,
-            emoji_reply: vec![],
+            emoji_reply: HashMap::new(),
         }
     }
 
@@ -75,9 +78,11 @@ impl ChannelViewEntry {
     }
 
     /// Add an emoji reply to this entry
-    // TODO add the from node id per emoji, and allow multiple of them
-    pub fn add_emoji(&mut self, emoji_string: String) {
-        self.emoji_reply.push(emoji_string);
+    pub fn add_emoji(&mut self, emoji_string: String, emoji_source: String) {
+        self.emoji_reply
+            .entry(emoji_string)
+            .and_modify(|sender_vec| sender_vec.push(emoji_source.clone()))
+            .or_insert(vec![emoji_source]);
     }
 
     /// Return true if the radio has acknowledged this message
@@ -86,7 +91,7 @@ impl ChannelViewEntry {
     }
 
     /// Return the emoji reply to this message, if any.
-    pub fn emojis(&self) -> &Vec<String> {
+    pub fn emojis(&self) -> &HashMap<String, Vec<String>> {
         &self.emoji_reply
     }
 
