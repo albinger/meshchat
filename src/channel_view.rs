@@ -14,6 +14,7 @@ use chrono::prelude::DateTime;
 use chrono::{Datelike, Local, Utc};
 use iced::font::Weight;
 use iced::widget::scrollable::Scrollbar;
+use iced::widget::text::Shaping::Advanced;
 use iced::widget::{
     container, scrollable, text, text_input, tooltip, Column, Container, Row, Space, Text,
 };
@@ -276,6 +277,7 @@ impl ChannelView {
             col = col.push(tooltip(
                 container(
                     text(name.clone())
+                        .shaping(Advanced)
                         .color(Self::color_from_name(name))
                         .font(Font {
                             weight: Weight::Bold,
@@ -284,7 +286,7 @@ impl ChannelView {
                 )
                 .style(name_box_style)
                 .padding([3, 3]),
-                text(format!("Sent from node '{name}'")),
+                text(format!("Sent from node '{name}'")).shaping(Advanced),
                 tooltip::Position::Top,
             ));
         }
@@ -294,8 +296,8 @@ impl ChannelView {
             && let Some(original_text) = self.text_from_id(*reply_to_id)
         {
             let quote_row = Row::new()
-                .push(text("Re: ").color(COLOR_GREEN))
-                .push(text(original_text).color(COLOR_GREEN));
+                .push(text("Re: ").color(COLOR_GREEN).shaping(Advanced))
+                .push(text(original_text).color(COLOR_GREEN).shaping(Advanced));
             col = col.push(quote_row);
         };
 
@@ -329,18 +331,25 @@ impl ChannelView {
 
         // Put on the right-hand side if my message, on the left if from someone else
         if mine {
-            col = col.align_x(Right);
             // Avoid very wide messages from me extending all the way to the left edge of the screen
             row = row.push(Space::with_width(100.0)).push(bubble);
+            col = col.align_x(Right).push(row);
         } else {
-            col = col.align_x(Left);
             // Avoid very wide messages from others extending all the way to the right edge
             row = row.push(bubble).push(Space::with_width(100.0));
+            col = col.align_x(Left).push(row);
         };
-        if let Some(emoji) = message.emojis() {
-            row = row.push(text(emoji.clone()));
+
+        // Add the emoji row outside the bubble, below it
+        if !message.emojis().is_empty() {
+            let mut emoji_row = Row::new().padding([0, 6]);
+            for emoji in message.emojis() {
+                emoji_row = emoji_row.push(text(emoji.clone()).size(18).shaping(Advanced));
+            }
+            col = col.push(emoji_row);
         }
-        col.push(row).into()
+
+        col.into()
     }
 
     fn color_from_name(name: &String) -> Color {

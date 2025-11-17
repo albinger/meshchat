@@ -24,7 +24,7 @@ pub struct ChannelViewEntry {
     name: Option<String>,
     seen: bool,
     acked: bool,
-    emoji_reply: Option<String>,
+    emoji_reply: Vec<String>,
 }
 
 impl ChannelViewEntry {
@@ -50,7 +50,7 @@ impl ChannelViewEntry {
             name,
             seen,
             acked: false,
-            emoji_reply: None,
+            emoji_reply: vec![],
         }
     }
 
@@ -77,7 +77,7 @@ impl ChannelViewEntry {
     /// Add an emoji reply to this entry
     // TODO add the from node id per emoji, and allow multiple of them
     pub fn add_emoji(&mut self, emoji_string: String) {
-        self.emoji_reply = Some(emoji_string);
+        self.emoji_reply.push(emoji_string);
     }
 
     /// Return true if the radio has acknowledged this message
@@ -86,8 +86,8 @@ impl ChannelViewEntry {
     }
 
     /// Return the emoji reply to this message, if any.
-    pub fn emojis(&self) -> Option<&String> {
-        self.emoji_reply.as_ref()
+    pub fn emojis(&self) -> &Vec<String> {
+        &self.emoji_reply
     }
 
     /// Return the time this message was received/sent as u64 seconds in EPOCH time
