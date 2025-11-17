@@ -1,6 +1,8 @@
 use crate::channel_view::ChannelId::Channel;
 use crate::channel_view::ChannelViewMessage::{ClearMessage, MessageInput};
-use crate::channel_view_entry::Payload::{Ping, Position, TextMessage};
+use crate::channel_view_entry::Payload::{
+    EmojiReply, NewTextMessage, Ping, Position, TextMessageReply,
+};
 use crate::device_view::DeviceViewMessage::ChannelMsg;
 use crate::styles::{
     name_box_style, text_input_style, COLOR_DICTIONARY, COLOR_GREEN,
@@ -81,13 +83,46 @@ impl ChannelView {
         for entry in entries_vec.iter_mut() {
             if entry.message_id() == request_id {
                 entry.ack();
+                break;
             }
         }
         self.entries = SortedVec::from_unsorted(entries_vec);
     }
 
+    fn add_emoji_to(&mut self, request_id: u32, emoji_string: String) {
+        // Convert to Vec to allow mutable access, modify entries, then rebuild SortedVec
+        let mut entries_vec: Vec<ChannelViewEntry> =
+            mem::take(&mut self.entries).into_iter().collect();
+        for entry in entries_vec.iter_mut() {
+            if entry.message_id() == request_id {
+                entry.add_emoji(emoji_string);
+                break;
+            }
+        }
+        self.entries = SortedVec::from_unsorted(entries_vec);
+    }
+
+    /// Return the next of a NewTextMessage that matches the given id, or None if not found
+    fn text_from_id(&self, id: u32) -> Option<String> {
+        for entry in &self.entries {
+            if let NewTextMessage(text_message) = entry.payload()
+                && entry.message_id() == id
+            {
+                return Some(text_message.clone());
+            }
+        }
+        None
+    }
+
     pub fn new_message(&mut self, new_message: ChannelViewEntry) {
-        self.entries.push(new_message);
+        match &new_message.payload() {
+            NewTextMessage(_) | Position(_, _) | Ping(_) | TextMessageReply(_, _) => {
+                let _ = self.entries.push(new_message);
+            }
+            EmojiReply(reply_to_id, emoji_string) => {
+                self.add_emoji_to(*reply_to_id, emoji_string.clone())
+            }
+        };
     }
 
     pub fn num_unseen_messages(&self) -> usize {
@@ -224,15 +259,18 @@ impl ChannelView {
 
         // TODO in the future we might change graphics based on type - just text for now
         let msg = match message.payload() {
-            TextMessage(text_msg) => text_msg.clone(),
+            NewTextMessage(text_msg) => text_msg.clone(),
             Position(lat, long) => {
                 let latitude = 0.0000001 * *lat as f64;
                 let longitude = 0.0000001 * *long as f64;
                 format!("({}, {})", latitude, longitude)
             }
             Ping(short_name) => format!("Ping from user '{}'", short_name),
+            TextMessageReply(_, text_msg) => text_msg.clone(),
+            EmojiReply(_, _) => "".to_string(), // Should never happen
         };
 
+        // Add the source node name if there is one
         let mut col = Column::new();
         if let Some(name) = message.name() {
             col = col.push(tooltip(
@@ -251,7 +289,18 @@ impl ChannelView {
             ));
         }
 
-        let mut row = Row::new()
+        // Add a row the message we are replying to if there is one
+        if let TextMessageReply(reply_to_id, _) = message.payload()
+            && let Some(original_text) = self.text_from_id(*reply_to_id)
+        {
+            let quote_row = Row::new()
+                .push(text("Re: ").color(COLOR_GREEN))
+                .push(text(original_text).color(COLOR_GREEN));
+            col = col.push(quote_row);
+        };
+
+        // Create the row with message text and time
+        let mut text_row = Row::new()
             .push(
                 text(msg)
                     .style(|_| MESSAGE_TEXT_STYLE)
@@ -263,25 +312,35 @@ impl ChannelView {
             .align_y(Bottom);
 
         if message.acked() {
-            row = row.push(text("✓").size(14).color(COLOR_GREEN))
+            text_row = text_row.push(text("✓").size(14).color(COLOR_GREEN))
         };
 
-        let bubble = Container::new(col.push(row))
+        // Add the message text and time row
+        col = col.push(text_row);
+
+        // add the container around everything and style it
+        let bubble = Container::new(col)
             .padding([6, 8])
             .style(move |_theme: &Theme| style);
 
         let mut row = Row::new().padding([6, 6]);
+
+        let mut col = Column::new().width(Fill);
+
         // Put on the right-hand side if my message, on the left if from someone else
         if mine {
+            col = col.align_x(Right);
             // Avoid very wide messages from me extending all the way to the left edge of the screen
             row = row.push(Space::with_width(100.0)).push(bubble);
-            Column::new().width(Fill).align_x(Right).push(row).into()
         } else {
-            // TODO from - maybe a name or an icon from the u32? Need to store them somewhere?
+            col = col.align_x(Left);
             // Avoid very wide messages from others extending all the way to the right edge
             row = row.push(bubble).push(Space::with_width(100.0));
-            Column::new().width(Fill).align_x(Left).push(row).into()
+        };
+        if let Some(emoji) = message.emojis() {
+            row = row.push(text(emoji.clone()));
         }
+        col.push(row).into()
     }
 
     fn color_from_name(name: &String) -> Color {

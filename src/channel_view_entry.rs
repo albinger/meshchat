@@ -4,7 +4,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum Payload {
-    TextMessage(String),
+    NewTextMessage(String),
+    /// TextMessageReply(reply_to_id, reply text)
+    TextMessageReply(u32, String),
+    /// EmojiReply(reply_to_id, emoji_code string)
+    EmojiReply(u32, String),
     Position(i32, i32),
     Ping(String), // Could add hw_model or similar if wanted
 }
@@ -21,7 +25,6 @@ pub struct ChannelViewEntry {
     seen: bool,
     acked: bool,
     emoji_reply: Option<String>,
-    reply_to: Option<u32>, // Another ChannelViewEntry.message_id
 }
 
 impl ChannelViewEntry {
@@ -33,8 +36,6 @@ impl ChannelViewEntry {
         message_id: u32,
         name: Option<String>,
         seen: bool,
-        emoji_reply: Option<String>,
-        reply_to: Option<u32>,
     ) -> Self {
         let rx_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -49,8 +50,7 @@ impl ChannelViewEntry {
             name,
             seen,
             acked: false,
-            emoji_reply,
-            reply_to,
+            emoji_reply: None,
         }
     }
 
@@ -74,9 +74,20 @@ impl ChannelViewEntry {
         self.acked = true;
     }
 
+    /// Add an emoji reply to this entry
+    // TODO add the from node id per emoji, and allow multiple of them
+    pub fn add_emoji(&mut self, emoji_string: String) {
+        self.emoji_reply = Some(emoji_string);
+    }
+
     /// Return true if the radio has acknowledged this message
     pub fn acked(&self) -> bool {
         self.acked
+    }
+
+    /// Return the emoji reply to this message, if any.
+    pub fn emojis(&self) -> Option<&String> {
+        self.emoji_reply.as_ref()
     }
 
     /// Return the time this message was received/sent as u64 seconds in EPOCH time

@@ -1,6 +1,8 @@
 use crate::channel_view::{ChannelId, ChannelView, ChannelViewMessage};
 use crate::channel_view_entry::ChannelViewEntry;
-use crate::channel_view_entry::Payload::{Ping, Position, TextMessage};
+use crate::channel_view_entry::Payload::{
+    EmojiReply, NewTextMessage, Ping, Position, TextMessageReply,
+};
 use crate::config::Config;
 use crate::device_subscription::SubscriberMessage::{Connect, Disconnect, SendText};
 use crate::device_subscription::SubscriptionEvent::{
@@ -325,24 +327,59 @@ impl DeviceView {
                         channel_view.ack(data.request_id)
                     }
                 }
-                Ok(PortNum::AlertApp) | Ok(PortNum::TextMessageApp) => {
+                Ok(PortNum::AlertApp) => {
+                    // TODO something special for an Alert message!
                     let channel_id = self.channel_id_from_packet(mesh_packet);
                     let name = self.source_name(mesh_packet);
                     if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
                         let seen = self.viewing_channel == Some(channel_id.clone());
                         let new_message = ChannelViewEntry::new(
-                            TextMessage(String::from_utf8(data.payload.clone()).unwrap()),
+                            NewTextMessage(String::from_utf8(data.payload.clone()).unwrap()),
                             mesh_packet.from,
                             mesh_packet.id,
                             name,
                             seen,
-                            None,
-                            None,
                         );
 
                         channel_view.new_message(new_message);
                     } else {
-                        eprintln!("No channel for ChannelId: {}", channel_id);
+                        eprintln!("No channel for packet");
+                    }
+                }
+                Ok(PortNum::TextMessageApp) => {
+                    let channel_id = self.channel_id_from_packet(mesh_packet);
+                    let name = self.source_name(mesh_packet);
+                    if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
+                        let message = if data.reply_id == 0 {
+                            NewTextMessage(String::from_utf8(data.payload.clone()).unwrap())
+                        } else {
+                            // Emoji reply to an earlier message
+                            if data.emoji == 1 {
+                                EmojiReply(
+                                    data.reply_id,
+                                    String::from_utf8(data.payload.clone()).unwrap(),
+                                )
+                            } else {
+                                // Text reply to an earlier message
+                                TextMessageReply(
+                                    data.reply_id,
+                                    String::from_utf8(data.payload.clone()).unwrap(),
+                                )
+                            }
+                        };
+
+                        let seen = self.viewing_channel == Some(channel_id.clone());
+                        let new_message = ChannelViewEntry::new(
+                            message,
+                            mesh_packet.from,
+                            mesh_packet.id,
+                            name,
+                            seen,
+                        );
+
+                        channel_view.new_message(new_message);
+                    } else {
+                        eprintln!("No channel for packet");
                     }
                 }
                 Ok(PortNum::PositionApp) => {
@@ -358,8 +395,6 @@ impl DeviceView {
                             mesh_packet.id,
                             name,
                             seen,
-                            None,
-                            None,
                         );
                         channel_view.new_message(new_message);
                     } else {
@@ -384,8 +419,6 @@ impl DeviceView {
                             mesh_packet.id,
                             name,
                             seen,
-                            None,
-                            None,
                         );
                         channel_view.new_message(new_message);
                     } else {
