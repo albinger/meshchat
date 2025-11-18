@@ -1,4 +1,3 @@
-use crate::Message::{Device, Navigation};
 use crate::channel_view::{ChannelId, ChannelView, ChannelViewMessage};
 use crate::channel_view_entry::ChannelViewEntry;
 use crate::channel_view_entry::Payload::{
@@ -15,22 +14,22 @@ use crate::device_view::DeviceViewMessage::{
     ChannelMsg, ConnectRequest, DisconnectRequest, SearchInput, SendMessage, ShowChannel,
     SubscriptionMessage,
 };
-use crate::styles::{NO_BORDER, NO_SHADOW, VIEW_BUTTON_BORDER, chip_style, text_input_style};
-use crate::{Message, View, device_subscription};
+use crate::styles::{chip_style, text_input_style, NO_BORDER, NO_SHADOW, VIEW_BUTTON_BORDER};
+use crate::Message::{Device, Navigation};
+use crate::{Message, View};
 use iced::widget::button::Status::Hovered;
 use iced::widget::button::{Status, Style};
 use iced::widget::scrollable::Scrollbar;
 use iced::widget::text::Shaping::Advanced;
-use iced::widget::{Button, Column, Row, Space, button, row, scrollable, text, text_input};
-use iced::{Background, Color, Element, Fill, Task, Theme, alignment};
-use iced_futures::Subscription;
-use meshtastic::Message as _;
+use iced::widget::{button, row, scrollable, text, text_input, Button, Column, Row, Space};
+use iced::{alignment, Background, Color, Element, Fill, Task, Theme};
 use meshtastic::protobufs::channel::Role;
 use meshtastic::protobufs::channel::Role::*;
 use meshtastic::protobufs::from_radio::PayloadVariant;
 use meshtastic::protobufs::mesh_packet::PayloadVariant::Decoded;
 use meshtastic::protobufs::{Channel, FromRadio, MeshPacket, NodeInfo, PortNum};
 use meshtastic::utils::stream::BleDevice;
+use meshtastic::Message as _;
 use std::collections::HashMap;
 use tokio::sync::mpsc::Sender;
 
@@ -634,11 +633,5 @@ impl DeviceView {
             .into()])
         .padding([0, 4]) // 6 pixels spacing minus the 2-pixel border width
         .into()
-    }
-
-    /// Create subscriptions for events coming from a connected hardware device (radio)
-    pub fn subscription(&self) -> Subscription<DeviceViewMessage> {
-        Subscription::run_with_id("device", device_subscription::subscribe())
-            .map(SubscriptionMessage)
     }
 }

@@ -4,7 +4,7 @@
 use crate::config::{load_config, save_config, Config};
 use crate::device_list_view::{ble_discovery, DeviceListView, DiscoveryEvent};
 use crate::device_view::ConnectionState::Connected;
-use crate::device_view::DeviceViewMessage::DisconnectRequest;
+use crate::device_view::DeviceViewMessage::{DisconnectRequest, SubscriptionMessage};
 use crate::device_view::{ConnectionState, DeviceView, DeviceViewMessage};
 use crate::linear::Linear;
 use crate::styles::chip_style;
@@ -202,10 +202,13 @@ impl MeshChat {
 
     /// Subscribe to events from Discover and from Windows and from Devices (Radios)
     fn subscription(&self) -> Subscription<Message> {
+        // TODO keyboard navigation
+        //         iced::event::listen().map(ModalKeyEvent)
         let subscriptions = vec![
             iced::event::listen().map(WindowEvent),
             Subscription::run(ble_discovery).map(DeviceListEvent),
-            self.device_view.subscription().map(Device),
+            Subscription::run(device_subscription::subscribe)
+                .map(|m| Device(SubscriptionMessage(m))),
         ];
 
         Subscription::batch(subscriptions)
