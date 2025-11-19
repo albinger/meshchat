@@ -5,20 +5,20 @@ use crate::channel_view_entry::Payload::{
 };
 use crate::device_view::DeviceViewMessage::ChannelMsg;
 use crate::styles::{
-    COLOR_DICTIONARY, COLOR_GREEN, DAY_SEPARATOR_STYLE, MESSAGE_TEXT_STYLE,
-    MY_MESSAGE_BUBBLE_STYLE, OTHERS_MESSAGE_BUBBLE_STYLE, TIME_TEXT_COLOR, TIME_TEXT_SIZE,
-    TIME_TEXT_WIDTH, name_box_style, text_input_style,
+    name_box_style, text_input_style, COLOR_DICTIONARY, COLOR_GREEN,
+    DAY_SEPARATOR_STYLE, MESSAGE_TEXT_STYLE, MY_MESSAGE_BUBBLE_STYLE, OTHERS_MESSAGE_BUBBLE_STYLE,
+    TIME_TEXT_COLOR, TIME_TEXT_SIZE, TIME_TEXT_WIDTH,
 };
-use crate::{Message, channel_view_entry::ChannelViewEntry};
+use crate::{channel_view_entry::ChannelViewEntry, Message};
 use chrono::prelude::DateTime;
 use chrono::{Datelike, Local, Utc};
-use iced::Length::Fixed;
 use iced::font::Weight;
 use iced::widget::scrollable::Scrollbar;
 use iced::widget::text::Shaping::Advanced;
 use iced::widget::{
-    Column, Container, Row, Space, Text, container, scrollable, text, text_input, tooltip,
+    container, scrollable, text, text_input, tooltip, Column, Container, Row, Space, Text,
 };
+use iced::Length::Fixed;
 use iced::{
     Bottom, Center, Color, Element, Fill, Font, Left, Padding, Renderer, Right, Task, Theme,
 };
@@ -276,9 +276,9 @@ impl ChannelView {
         };
 
         // Add the source node name if there is one
-        let mut col = Column::new();
+        let mut message_content_column = Column::new();
         if let Some(name) = message.name() {
-            col = col.push(tooltip(
+            message_content_column = message_content_column.push(tooltip(
                 container(
                     text(name.clone())
                         .shaping(Advanced)
@@ -302,11 +302,11 @@ impl ChannelView {
             let quote_row = Row::new()
                 .push(text("Re: ").color(COLOR_GREEN).shaping(Advanced))
                 .push(text(original_text).color(COLOR_GREEN).shaping(Advanced));
-            col = col.push(quote_row);
+            message_content_column = message_content_column.push(quote_row);
         };
 
-        // Create the row with message text and time
-        let mut text_row = Row::new()
+        // Create the row with message text and time and maybe an ACK tick mark
+        let mut text_and_time_row = Row::new()
             .push(
                 text(msg)
                     .style(|_| MESSAGE_TEXT_STYLE)
@@ -318,30 +318,36 @@ impl ChannelView {
             .align_y(Bottom);
 
         if message.acked() {
-            text_row = text_row.push(text("✓").size(14).color(COLOR_GREEN))
+            text_and_time_row = text_and_time_row.push(text("✓").size(14).color(COLOR_GREEN))
         };
 
         // Add the message text and time row
-        col = col.push(text_row);
+        message_content_column = message_content_column.push(text_and_time_row);
 
-        // add the container around everything and style it
-        let bubble = Container::new(col)
+        // Create the container around the message content column and style it
+        let message_bubble = Container::new(message_content_column)
             .padding([6, 8])
             .style(move |_theme: &Theme| style);
 
-        let mut row = Row::new().padding([6, 6]);
+        let mut message_row = Row::new().padding([6, 6]);
 
-        let mut col = Column::new().width(Fill);
+        // The outer container object that spans the width of the view and justifies the message
+        // row within it depending on who sent the message
+        let mut message_column = Column::new().width(Fill);
 
         // Put on the right-hand side if my message, on the left if from someone else
         if mine {
             // Avoid very wide messages from me extending all the way to the left edge of the screen
-            row = row.push(Space::with_width(100.0)).push(bubble);
-            col = col.align_x(Right).push(row);
+            message_row = message_row
+                .push(Space::with_width(100.0))
+                .push(message_bubble);
+            message_column = message_column.align_x(Right).push(message_row);
         } else {
             // Avoid very wide messages from others extending all the way to the right edge
-            row = row.push(bubble).push(Space::with_width(100.0));
-            col = col.align_x(Left).push(row);
+            message_row = message_row
+                .push(message_bubble)
+                .push(Space::with_width(100.0));
+            message_column = message_column.align_x(Left).push(message_row);
         };
 
         // Add the emoji row outside the bubble, below it
@@ -356,12 +362,14 @@ impl ChannelView {
                     tooltip::Position::Bottom,
                 ));
             }
-            col = col.push(emoji_row);
+            message_column = message_column.push(emoji_row);
         }
 
-        col.into()
+        message_column.into()
     }
 
+    /// Hash the node name into a color index - to be able to assign a consistent color to the text
+    /// name for a node in the UI
     fn color_from_name(name: &String) -> Color {
         let mut hasher = DefaultHasher::new();
         name.hash(&mut hasher);
@@ -371,6 +379,8 @@ impl ChannelView {
         COLOR_DICTIONARY[index]
     }
 
+    /// Return an element (currently a Column) with a list of the names of the nodes that sent the
+    /// given emoji.
     fn list_of_nodes(&self, sources: &Vec<String>) -> Element<'static, Message> {
         let mut col = Column::new();
         for source in sources {
