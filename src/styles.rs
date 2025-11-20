@@ -80,6 +80,13 @@ const RADIUS_2: Radius = Radius {
     bottom_left: 2.0,
 };
 
+const RADIUS_4: Radius = Radius {
+    top_left: 4.0,
+    top_right: 4.0,
+    bottom_right: 4.0,
+    bottom_left: 4.0,
+};
+
 pub const NO_SHADOW: Shadow = Shadow {
     color: Color::TRANSPARENT,
     offset: iced::Vector { x: 0.0, y: 0.0 },
@@ -97,6 +104,12 @@ pub const RADIUS_12: Radius = Radius {
     top_right: 12.0,
     bottom_right: 12.0,
     bottom_left: 12.0,
+};
+
+pub const TOOLTIP_BORDER: Border = Border {
+    color: Color::WHITE,
+    width: 1.0,
+    radius: RADIUS_4,
 };
 
 pub const VIEW_BUTTON_BORDER: Border = Border {
@@ -176,6 +189,51 @@ const BUTTON_BORDER_ACTIVE: Border = Border {
     width: 2.0,
     color: CYAN,
 };
+
+pub fn source_tooltip_style(_theme: &Theme) -> Style {
+    Style {
+        text_color: Some(Color::WHITE),
+        background: Some(Color::BLACK.into()),
+        border: TOOLTIP_BORDER,
+        shadow: NO_SHADOW,
+    }
+}
+
+pub fn transparent_button_style(
+    _theme: &Theme,
+    status: button::Status,
+    color: Color,
+) -> button::Style {
+    let mut style = match status {
+        button::Status::Active => button::Style {
+            background: None,
+            text_color: Color::WHITE,
+            border: NO_BORDER,
+            shadow: NO_SHADOW,
+        },
+        button::Status::Hovered => button::Style {
+            background: None,
+            text_color: Color::WHITE,
+            border: NO_BORDER,
+            shadow: NO_SHADOW,
+        },
+        button::Status::Pressed => button::Style {
+            background: None,
+            text_color: Color::WHITE,
+            border: NO_BORDER,
+            shadow: NO_SHADOW,
+        },
+        button::Status::Disabled => button::Style {
+            background: None,
+            text_color: Color::WHITE,
+            border: NO_BORDER,
+            shadow: NO_SHADOW,
+        },
+    };
+
+    style.text_color = color;
+    style
+}
 
 pub fn button_chip_style(_theme: &Theme, status: button::Status) -> button::Style {
     match status {

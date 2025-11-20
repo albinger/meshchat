@@ -57,6 +57,11 @@ impl ChannelViewEntry {
         }
     }
 
+    /// Return the node id that sent the message
+    pub fn from(&self) -> u32 {
+        self.from
+    }
+
     /// Get a reference to the payload of this message
     pub fn payload(&self) -> &Payload {
         &self.payload

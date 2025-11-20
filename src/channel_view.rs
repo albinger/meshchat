@@ -3,12 +3,13 @@ use crate::channel_view::ChannelViewMessage::{ClearMessage, MessageInput};
 use crate::channel_view_entry::Payload::{
     EmojiReply, NewTextMessage, Ping, Position, TextMessageReply,
 };
-use crate::device_view::DeviceViewMessage::ChannelMsg;
+use crate::device_view::DeviceViewMessage::{ChannelMsg, ShowChannel};
 use crate::styles::{
-    name_box_style, text_input_style, COLOR_DICTIONARY, COLOR_GREEN,
-    DAY_SEPARATOR_STYLE, MESSAGE_TEXT_STYLE, MY_MESSAGE_BUBBLE_STYLE, OTHERS_MESSAGE_BUBBLE_STYLE,
-    TIME_TEXT_COLOR, TIME_TEXT_SIZE, TIME_TEXT_WIDTH,
+    source_tooltip_style, text_input_style, transparent_button_style, COLOR_DICTIONARY,
+    COLOR_GREEN, DAY_SEPARATOR_STYLE, MESSAGE_TEXT_STYLE, MY_MESSAGE_BUBBLE_STYLE,
+    OTHERS_MESSAGE_BUBBLE_STYLE, TIME_TEXT_COLOR, TIME_TEXT_SIZE, TIME_TEXT_WIDTH,
 };
+use crate::Message::Device;
 use crate::{channel_view_entry::ChannelViewEntry, Message};
 use chrono::prelude::DateTime;
 use chrono::{Datelike, Local, Utc};
@@ -16,7 +17,7 @@ use iced::font::Weight;
 use iced::widget::scrollable::Scrollbar;
 use iced::widget::text::Shaping::Advanced;
 use iced::widget::{
-    container, scrollable, text, text_input, tooltip, Column, Container, Row, Space, Text,
+    button, scrollable, text, text_input, tooltip, Column, Container, Row, Space, Text,
 };
 use iced::Length::Fixed;
 use iced::{
@@ -252,34 +253,36 @@ impl ChannelView {
         // TODO in the future we might change graphics based on type - just text for now
         let msg = match message.payload() {
             NewTextMessage(text_msg) => text_msg.clone(),
+            TextMessageReply(_, text_msg) => text_msg.clone(),
             Position(lat, long) => {
                 let latitude = 0.0000001 * *lat as f64;
                 let longitude = 0.0000001 * *long as f64;
                 format!("({}, {})", latitude, longitude)
             }
             Ping(short_name) => format!("Ping from user '{}'", short_name),
-            TextMessageReply(_, text_msg) => text_msg.clone(),
             EmojiReply(_, _) => "".to_string(), // Should never happen
         };
 
         // Add the source node name if there is one
+        // TODO try and show the full node name in the tooltip
         let mut message_content_column = Column::new();
         if let Some(name) = message.name() {
-            message_content_column = message_content_column.push(tooltip(
-                container(
-                    text(name.clone())
-                        .shaping(Advanced)
-                        .color(Self::color_from_name(name))
-                        .font(Font {
-                            weight: Weight::Bold,
-                            ..Default::default()
-                        }),
+            let text_color = Self::color_from_name(name);
+            message_content_column = message_content_column.push(
+                tooltip(
+                    button(text(name.clone()).shaping(Advanced).font(Font {
+                        weight: Weight::Bold,
+                        ..Default::default()
+                    }))
+                    .on_press(Device(ShowChannel(Some(ChannelId::Node(message.from())))))
+                    .style(move |theme, status| {
+                        transparent_button_style(theme, status, text_color)
+                    }),
+                    text(format!("Sent from node '{name}'")).shaping(Advanced),
+                    tooltip::Position::Top,
                 )
-                .style(name_box_style)
-                .padding([3, 3]),
-                text(format!("Sent from node '{name}'")).shaping(Advanced),
-                tooltip::Position::Top,
-            ));
+                .style(source_tooltip_style),
+            );
         }
 
         // Add a row to the message we are replying to if there is one
