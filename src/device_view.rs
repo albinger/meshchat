@@ -257,9 +257,7 @@ impl DeviceView {
                     )
                 });
             }
-            Some(_) => {
-                println!("Unexpected payload variant: {:?}", packet.payload_variant);
-            }
+            Some(_) => {}
             _ => println!("Error parsing packet: {:?}", packet.payload_variant),
         }
 
@@ -408,7 +406,9 @@ impl DeviceView {
                 Ok(PortNum::TelemetryApp) => {
                     let telemetry =
                         meshtastic::protobufs::Telemetry::decode(&data.payload as &[u8]).unwrap();
-                    println!("Telemetry: {telemetry:?} from {}", mesh_packet.from)
+                    if mesh_packet.from != self.my_node_num.unwrap() {
+                        println!("Telemetry: {telemetry:?} from {}", mesh_packet.from)
+                    }
                 }
                 Ok(PortNum::NeighborinfoApp) => println!("Neighbor Info payload"),
                 Ok(PortNum::NodeinfoApp) => {
