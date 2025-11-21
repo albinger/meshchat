@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Payload {
     NewTextMessage(String),
     /// TextMessageReply(reply_to_id, reply text)
@@ -16,7 +16,7 @@ pub enum Payload {
 
 /// An entry in the Channel View that represents some type of message sent to either this user on
 /// this device or to a channel this device can read. Can be any of [Payload] types.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ChannelViewEntry {
     from: u32,
     message_id: u32,

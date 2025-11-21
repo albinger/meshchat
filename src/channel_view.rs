@@ -77,6 +77,7 @@ impl ChannelView {
         }
     }
 
+    /// Acknowledge the receipt of a message.
     pub fn ack(&mut self, request_id: u32) {
         if let Some(entry) = self.entries.get_mut(&request_id) {
             entry.ack();
@@ -138,7 +139,7 @@ impl ChannelView {
                 self.message = String::new();
                 let channel_id = self.channel_id.clone();
                 Task::perform(empty(), move |_| {
-                    Message::Device(crate::device_view::DeviceViewMessage::SendMessage(
+                    Device(crate::device_view::DeviceViewMessage::SendMessage(
                         msg.clone(),
                         channel_id.clone(),
                     ))
@@ -235,8 +236,8 @@ impl ChannelView {
 
         text_input("Send Message", &self.message)
             .style(text_input_style)
-            .on_input(|s| Message::Device(ChannelMsg(MessageInput(s))))
-            .on_submit(Message::Device(ChannelMsg(ChannelViewMessage::SendMessage)))
+            .on_input(|s| Device(ChannelMsg(MessageInput(s))))
+            .on_submit(Device(ChannelMsg(ChannelViewMessage::SendMessage)))
             .padding([6, 6])
             .into()
     }
@@ -393,5 +394,65 @@ impl ChannelView {
             .color(TIME_TEXT_COLOR)
             .size(TIME_TEXT_SIZE)
             .width(Fixed(TIME_TEXT_WIDTH))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::channel_view::{ChannelId, ChannelView};
+    use crate::channel_view_entry::ChannelViewEntry;
+    use crate::channel_view_entry::Payload::NewTextMessage;
+    use std::time::Duration;
+
+    #[tokio::test]
+    async fn message_ordering_test() {
+        let mut channel_view = ChannelView::new(ChannelId::Channel(0), 0);
+        assert!(
+            channel_view.entries.is_empty(),
+            "Initial entries list should be empty"
+        );
+
+        // create a set of messages with more than a second between them
+        // message ids are not in order
+        let oldest_message = ChannelViewEntry::new(
+            NewTextMessage("Hello 1".to_string()),
+            1,
+            1,
+            Some("Source 1".to_string()),
+            false,
+        );
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+
+        let middle_message = ChannelViewEntry::new(
+            NewTextMessage("Hello 2".to_string()),
+            2,
+            1000,
+            Some("Source 2".to_string()),
+            false,
+        );
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+
+        let newest_message = ChannelViewEntry::new(
+            NewTextMessage("Hello 3".to_string()),
+            1,
+            500,
+            Some("Source 1".to_string()),
+            false,
+        );
+
+        // Add them in order
+        channel_view.new_message(oldest_message.clone());
+        channel_view.new_message(middle_message.clone());
+        channel_view.new_message(newest_message.clone());
+
+        assert_eq!(channel_view.num_unseen_messages(), 3);
+
+        println!("Entries: {:#?}", channel_view.entries);
+
+        // Check the order is correct
+        let mut iter = channel_view.entries.values();
+        assert_eq!(iter.next().unwrap(), &oldest_message);
+        assert_eq!(iter.next().unwrap(), &middle_message);
+        assert_eq!(iter.next().unwrap(), &newest_message);
     }
 }
