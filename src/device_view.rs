@@ -29,6 +29,7 @@ use meshtastic::protobufs::channel::Role;
 use meshtastic::protobufs::channel::Role::*;
 use meshtastic::protobufs::from_radio::PayloadVariant;
 use meshtastic::protobufs::mesh_packet::PayloadVariant::Decoded;
+use meshtastic::protobufs::telemetry::Variant::DeviceMetrics;
 use meshtastic::protobufs::{Channel, FromRadio, MeshPacket, NodeInfo, PortNum};
 use meshtastic::utils::stream::BleDevice;
 use meshtastic::Message as _;
@@ -411,7 +412,9 @@ impl DeviceView {
                     let telemetry =
                         meshtastic::protobufs::Telemetry::decode(&data.payload as &[u8]).unwrap();
                     if mesh_packet.from == self.my_node_num.unwrap() {
-                        println!("Telemetry: {telemetry:?}")
+                        if let Some(DeviceMetrics(metrics)) = telemetry.variant {
+                            println!("My Battery Level: {}", metrics.battery_level.unwrap())
+                        }
                     }
                 }
                 Ok(PortNum::NeighborinfoApp) => println!("Neighbor Info payload"),
