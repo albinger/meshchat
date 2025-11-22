@@ -19,7 +19,7 @@ use meshtastic::utils;
 use meshtastic::utils::stream::BleDevice;
 use std::pin::Pin;
 use std::time::Duration;
-use tokio::sync::mpsc::{Sender, channel};
+use tokio::sync::mpsc::{channel, Sender};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_stream::{Stream, StreamExt};
 
@@ -208,7 +208,8 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
 
 async fn do_connect(device: &BleDevice) -> Result<(PacketReceiver, ConnectedStreamApi), Error> {
     let ble_stream =
-        utils::stream::build_ble_stream(&device.mac_address.into(), Duration::from_secs(4)).await?;
+        utils::stream::build_ble_stream::<BleDevice>(device.clone(), Duration::from_secs(4))
+            .await?;
     let stream_api = StreamApi::new();
     let (packet_receiver, stream_api) = stream_api.connect(ble_stream).await;
     let config_id = utils::generate_rand_id();
