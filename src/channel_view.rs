@@ -23,12 +23,11 @@ use iced::widget::{
 use iced::{
     Bottom, Center, Color, Element, Fill, Font, Left, Padding, Renderer, Right, Task, Theme,
 };
+use ringmap::RingMap;
 use serde::{Deserialize, Serialize};
-use sorted_vec::SortedVec;
 use std::collections::hash_map::DefaultHasher;
 use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
-use std::mem;
 
 #[derive(Debug, Clone)]
 pub enum ChannelViewMessage {
@@ -59,63 +58,48 @@ impl Display for ChannelId {
 /// messages to and from a "Channel" which can be a Channel or a Node
 pub struct ChannelView {
     channel_id: ChannelId,
-    message: String,                      // text message typed in so far
-    entries: SortedVec<ChannelViewEntry>, // entries received so far
+    message: String,                         // text message typed in so far
+    entries: RingMap<u32, ChannelViewEntry>, // entries received so far, keyed by message_id, ordered by rx_time
     my_source: u32,
 }
 
 async fn empty() {}
 
-/// A view of a single channel and it's message, which maybe a real radio "Channel" or a chat channel
-/// with a specific [meshtastic:User]
+// A view of a single channel and it's message, which maybe a real radio "Channel" or a chat channel
+// with a specific [meshtastic:User]
 impl ChannelView {
     pub fn new(channel_id: ChannelId, source: u32) -> Self {
         Self {
             channel_id,
             message: String::new(),
-            entries: SortedVec::new(),
+            entries: RingMap::new(),
             my_source: source,
         }
     }
 
     /// Acknowledge the receipt of a message.
     pub fn ack(&mut self, request_id: u32) {
-        // Convert to Vec to allow mutable access, modify entries, then rebuild SortedVec
-        let mut entries_vec: Vec<ChannelViewEntry> =
-            mem::take(&mut self.entries).into_iter().collect();
-        for entry in entries_vec.iter_mut() {
-            if entry.message_id() == request_id {
-                entry.ack();
-                break;
-            }
+        if let Some(entry) = self.entries.get_mut(&request_id) {
+            entry.ack();
         }
-        self.entries = SortedVec::from_unsorted(entries_vec);
     }
 
     /// Add an emoji reply to a message.
     fn add_emoji_to(&mut self, request_id: u32, emoji_string: String, source_name: String) {
-        // Convert to Vec to allow mutable access, modify entries, then rebuild SortedVec
-        let mut entries_vec: Vec<ChannelViewEntry> =
-            mem::take(&mut self.entries).into_iter().collect();
-        for entry in entries_vec.iter_mut() {
-            if entry.message_id() == request_id {
-                entry.add_emoji(emoji_string, source_name);
-                break;
-            }
+        if let Some(entry) = self.entries.get_mut(&request_id) {
+            entry.add_emoji(emoji_string, source_name);
         }
-        self.entries = SortedVec::from_unsorted(entries_vec);
     }
 
     /// Return the text of a NewTextMessage that matches the given id, or None if not found
     fn text_from_id(&self, id: u32) -> Option<String> {
-        for entry in &self.entries {
-            if let NewTextMessage(text_message) = entry.payload()
-                && entry.message_id() == id
-            {
-                return Some(text_message.clone());
+        self.entries.get(&id).and_then(|entry| {
+            if let NewTextMessage(text_message) = entry.payload() {
+                Some(text_message.clone())
+            } else {
+                None
             }
-        }
-        None
+        })
     }
 
     /// Add a new [ChannelViewEntry] message to the [ChannelView]
@@ -124,7 +108,8 @@ impl ChannelView {
             NewTextMessage(_) | Position(_, _) | Ping(_) | TextMessageReply(_, _) => {
                 // TODO manage the size of entries, with a limit (fixed or time?), and pushing
                 // the older ones to a disk store of messages
-                let _ = self.entries.push(new_message);
+                self.entries
+                    .insert_sorted(new_message.message_id(), new_message);
             }
             EmojiReply(reply_to_id, emoji_string) => {
                 self.add_emoji_to(
@@ -169,10 +154,11 @@ impl ChannelView {
 
     /// Construct an Element that displays the channel view
     pub fn view(&self) -> Element<'static, Message> {
+        let mut channel_view = Column::new();
+
         let mut previous_day = u32::MIN;
 
-        let mut channel_view = Column::new();
-        for message in &self.entries {
+        for message in self.entries.values() {
             let datetime_utc = DateTime::<Utc>::from_timestamp_secs(message.time() as i64).unwrap();
             let datetime_local = datetime_utc.with_timezone(&Local);
             let message_day = datetime_local.day();
