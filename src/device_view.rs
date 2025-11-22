@@ -303,7 +303,7 @@ impl DeviceView {
     }
 
     /// Figure out which channel we should show a message in a [MeshPacket]
-    /// i.e. is a broadcast message in a channel, or a DM to/from my node.
+    /// i.e., is a broadcast message in a channel, or a DM to/from my node.
     fn channel_id_from_packet(&mut self, mesh_packet: &MeshPacket) -> ChannelId {
         if mesh_packet.to == u32::MAX {
             // Destined for a channel
@@ -444,6 +444,8 @@ impl DeviceView {
         Task::none()
     }
 
+    /// Return an Optional name to display in the message box as the source of a message.
+    /// If the message is from myself, then return None.
     fn source_name(&self, mesh_packet: &MeshPacket) -> Option<String> {
         if Some(mesh_packet.from) == self.my_node_num {
             return None;
