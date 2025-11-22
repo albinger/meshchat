@@ -121,5 +121,3 @@ impl PartialEq<Self> for ChannelViewEntry {
         self.rx_time == other.rx_time
     }
 }
-
-impl Eq for ChannelViewEntry {}
