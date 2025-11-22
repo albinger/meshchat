@@ -122,16 +122,4 @@ impl PartialEq<Self> for ChannelViewEntry {
     }
 }
 
-impl PartialOrd<Self> for ChannelViewEntry {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for ChannelViewEntry {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.rx_time.cmp(&other.rx_time)
-    }
-}
-
 impl Eq for ChannelViewEntry {}
