@@ -444,6 +444,8 @@ impl DeviceView {
         Task::none()
     }
 
+    /// Return an Optional name to display in the message box as the source of a message.
+    /// If the message is from myself, then return None.
     fn source_name(&self, mesh_packet: &MeshPacket) -> Option<String> {
         if Some(mesh_packet.from) == self.my_node_num {
             return None;
