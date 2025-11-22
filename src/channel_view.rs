@@ -1,3 +1,4 @@
+use crate::Message::{Device, ShowLocation};
 use crate::channel_view::ChannelId::Channel;
 use crate::channel_view::ChannelViewMessage::{ClearMessage, MessageInput};
 use crate::channel_view_entry::Payload::{
@@ -5,21 +6,20 @@ use crate::channel_view_entry::Payload::{
 };
 use crate::device_view::DeviceViewMessage::{ChannelMsg, ShowChannel};
 use crate::styles::{
-    source_tooltip_style, text_input_style, transparent_button_style, COLOR_DICTIONARY,
-    COLOR_GREEN, DAY_SEPARATOR_STYLE, MESSAGE_TEXT_STYLE, MY_MESSAGE_BUBBLE_STYLE,
-    OTHERS_MESSAGE_BUBBLE_STYLE, TIME_TEXT_COLOR, TIME_TEXT_SIZE, TIME_TEXT_WIDTH,
+    COLOR_DICTIONARY, COLOR_GREEN, DAY_SEPARATOR_STYLE, MESSAGE_TEXT_STYLE,
+    MY_MESSAGE_BUBBLE_STYLE, OTHERS_MESSAGE_BUBBLE_STYLE, TIME_TEXT_COLOR, TIME_TEXT_SIZE,
+    TIME_TEXT_WIDTH, source_tooltip_style, text_input_style, transparent_button_style,
 };
-use crate::Message::{Device, ShowLocation};
-use crate::{channel_view_entry::ChannelViewEntry, Message};
+use crate::{Message, channel_view_entry::ChannelViewEntry};
 use chrono::prelude::DateTime;
 use chrono::{Datelike, Local, Utc};
+use iced::Length::Fixed;
 use iced::font::Weight;
 use iced::widget::scrollable::Scrollbar;
 use iced::widget::text::Shaping::Advanced;
 use iced::widget::{
-    button, scrollable, text, text_input, tooltip, Column, Container, Row, Space, Text,
+    Column, Container, Row, Space, Text, button, scrollable, text, text_input, tooltip,
 };
-use iced::Length::Fixed;
 use iced::{
     Bottom, Center, Color, Element, Fill, Font, Left, Padding, Renderer, Right, Task, Theme,
 };
@@ -66,8 +66,8 @@ pub struct ChannelView {
 
 async fn empty() {}
 
-// A view of a single channel and it's message, which maybe a real radio "Channel" or a chat channel
-// with a specific [meshtastic:User]
+/// A view of a single channel and it's message, which maybe a real radio "Channel" or a chat channel
+/// with a specific [meshtastic:User]
 impl ChannelView {
     pub fn new(channel_id: ChannelId, source: u32) -> Self {
         Self {
@@ -92,6 +92,7 @@ impl ChannelView {
         self.entries = SortedVec::from_unsorted(entries_vec);
     }
 
+    /// Add an emoji reply to a message.
     fn add_emoji_to(&mut self, request_id: u32, emoji_string: String, source_name: String) {
         // Convert to Vec to allow mutable access, modify entries, then rebuild SortedVec
         let mut entries_vec: Vec<ChannelViewEntry> =
@@ -117,6 +118,7 @@ impl ChannelView {
         None
     }
 
+    /// Add a new [ChannelViewEntry] message to the [ChannelView]
     pub fn new_message(&mut self, new_message: ChannelViewEntry) {
         match &new_message.payload() {
             NewTextMessage(_) | Position(_, _) | Ping(_) | TextMessageReply(_, _) => {
@@ -134,10 +136,12 @@ impl ChannelView {
         };
     }
 
+    /// Return the number of messages in the channel
     pub fn num_unseen_messages(&self) -> usize {
         self.entries.len()
     }
 
+    /// Update the [ChannelView] state based on a [ChannelViewMessage]
     pub fn update(&mut self, channel_view_message: ChannelViewMessage) -> Task<Message> {
         match channel_view_message {
             MessageInput(s) => {
@@ -163,12 +167,11 @@ impl ChannelView {
         }
     }
 
-    // Make this a struct and move the message field in here
+    /// Construct an Element that displays the channel view
     pub fn view(&self) -> Element<'static, Message> {
-        let mut channel_view = Column::new();
-
         let mut previous_day = u32::MIN;
 
+        let mut channel_view = Column::new();
         for message in &self.entries {
             let datetime_utc = DateTime::<Utc>::from_timestamp_secs(message.time() as i64).unwrap();
             let datetime_local = datetime_utc.with_timezone(&Local);
@@ -209,6 +212,8 @@ impl ChannelView {
     /// "%A" - day name e.g. "Friday"
     fn day_separator(datetime_local: &DateTime<Local>) -> Element<'static, Message> {
         let now_local = Local::now();
+        let today = now_local.day();
+
         let format_string = if datetime_local.iso_week() < now_local.iso_week() {
             if datetime_local.year() != now_local.year() {
                 // before the beginning of year week, so how the day name, month name and date
@@ -217,6 +222,8 @@ impl ChannelView {
                 // before the beginning of this week, so how the day name, month name and date
                 "%A, %b %e"
             }
+        } else if datetime_local.day() == today {
+            "Today"
         } else {
             // Same week, so just show the day name
             "%A"
