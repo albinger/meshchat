@@ -65,8 +65,8 @@ pub struct ChannelView {
 
 async fn empty() {}
 
-// A view of a single channel and it's message, which maybe a real radio "Channel" or a chat channel
-// with a specific [meshtastic:User]
+/// A view of a single channel and it's message, which maybe a real radio "Channel" or a chat channel
+/// with a specific [meshtastic:User]
 impl ChannelView {
     pub fn new(channel_id: ChannelId, source: u32) -> Self {
         Self {
@@ -84,6 +84,7 @@ impl ChannelView {
         }
     }
 
+    /// Add an emoji reply to a message.
     fn add_emoji_to(&mut self, request_id: u32, emoji_string: String, source_name: String) {
         if let Some(entry) = self.entries.get_mut(&request_id) {
             entry.add_emoji(emoji_string, source_name);
@@ -101,6 +102,7 @@ impl ChannelView {
         })
     }
 
+    /// Add a new [ChannelViewEntry] message to the [ChannelView]
     pub fn new_message(&mut self, new_message: ChannelViewEntry) {
         match &new_message.payload() {
             NewTextMessage(_) | Position(_, _) | Ping(_) | TextMessageReply(_, _) => {
@@ -122,10 +124,12 @@ impl ChannelView {
         };
     }
 
+    /// Return the number of messages in the channel
     pub fn num_unseen_messages(&self) -> usize {
         self.entries.len()
     }
 
+    /// Update the [ChannelView] state based on a [ChannelViewMessage]
     pub fn update(&mut self, channel_view_message: ChannelViewMessage) -> Task<Message> {
         match channel_view_message {
             MessageInput(s) => {
@@ -151,7 +155,7 @@ impl ChannelView {
         }
     }
 
-    // Make this a struct and move the message field in here
+    /// Construct an Element that displays the channel view
     pub fn view(&self) -> Element<'static, Message> {
         let mut channel_view = Column::new();
 
@@ -197,6 +201,8 @@ impl ChannelView {
     /// "%A" - day name e.g. "Friday"
     fn day_separator(datetime_local: &DateTime<Local>) -> Element<'static, Message> {
         let now_local = Local::now();
+        let today = now_local.day();
+
         let format_string = if datetime_local.iso_week() < now_local.iso_week() {
             if datetime_local.year() != now_local.year() {
                 // before the beginning of year week, so how the day name, month name and date
@@ -205,6 +211,8 @@ impl ChannelView {
                 // before the beginning of this week, so how the day name, month name and date
                 "%A, %b %e"
             }
+        } else if datetime_local.day() == today {
+            "Today"
         } else {
             // Same week, so just show the day name
             "%A"
