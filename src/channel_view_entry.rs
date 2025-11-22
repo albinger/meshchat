@@ -109,6 +109,11 @@ impl ChannelViewEntry {
     pub fn name(&self) -> &Option<String> {
         &self.name
     }
+
+    /// Order two messages - using the rx_time field.
+    pub fn sort_by_rx_time(_: &u32, left: &Self, _: &u32, right: &Self) -> Ordering {
+        left.rx_time.cmp(&right.rx_time)
+    }
 }
 
 impl PartialEq<Self> for ChannelViewEntry {
