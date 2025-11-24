@@ -4,6 +4,7 @@ use directories::ProjectDirs;
 use iced::Task;
 use meshtastic::utils::stream::BleDevice;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::io;
 use std::path::PathBuf;
 use tokio::fs::DirBuilder;
@@ -14,6 +15,7 @@ use tokio::io::AsyncWriteExt;
 pub struct Config {
     pub device: Option<BleDevice>,
     pub channel_id: Option<ChannelId>,
+    pub fav_nodes: HashSet<u32>,
 }
 
 // Private methods for async reading and writing of config files

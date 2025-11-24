@@ -2,10 +2,11 @@
 //! meshtastic compatible radios connected to the host running it
 
 use crate::Message::{
-    AppError, AppNotification, Device, DeviceListEvent, Exit, Navigation, NewConfig,
-    RemoveNotification, SaveConfig, WindowEvent,
+    AppError, AppNotification, ConfigChange, Device, DeviceListEvent, Exit, Navigation, NewConfig,
+    RemoveNotification, ToggleNodeFavourite, WindowEvent,
 };
 use crate::View::DeviceList;
+use crate::channel_view::ChannelId;
 use crate::config::{Config, load_config, save_config};
 use crate::device_list_view::{DeviceListView, DiscoveryEvent, ble_discovery};
 use crate::device_view::ConnectionState::Connected;
@@ -53,11 +54,17 @@ enum Notification {
 
 #[derive(Default)]
 struct MeshChat {
+    config: Config,
     current_view: View,
     device_list_view: DeviceListView,
     device_view: DeviceView,
     notifications: Vec<(usize, Notification)>,
     next_id: usize,
+}
+
+#[derive(Debug, Clone)]
+pub enum ConfigChangeMessage {
+    DeviceAndChannel(Option<BleDevice>, Option<ChannelId>),
 }
 
 /// These are the messages that MeshChat responds to
@@ -69,11 +76,12 @@ pub enum Message {
     Device(DeviceViewMessage),
     Exit,
     NewConfig(Config),
-    SaveConfig(Config),
+    ConfigChange(ConfigChangeMessage),
     ShowLocation(f64, f64), // lat and long
     AppNotification(String, String),
     AppError(String, String),
     RemoveNotification(usize),
+    ToggleNodeFavourite(u32),
     None,
 }
 
@@ -118,16 +126,6 @@ impl MeshChat {
             DeviceListEvent(discovery_event) => self.device_list_view.update(discovery_event),
             Device(device_event) => self.device_view.update(device_event),
             Exit => window::get_latest().and_then(window::close),
-            NewConfig(config) => {
-                if let Some(device) = &config.device {
-                    self.device_view.update(DeviceViewMessage::ConnectRequest(
-                        device.clone(),
-                        config.channel_id,
-                    ))
-                } else {
-                    Task::none()
-                }
-            }
             AppNotification(summary, detail) => {
                 self.add_notification(Notification::Info(summary, detail));
                 Task::none()
@@ -137,7 +135,28 @@ impl MeshChat {
                 Task::none()
             }
             Message::None => Task::none(),
-            SaveConfig(config) => save_config(config),
+            NewConfig(config) => {
+                self.config = config;
+                if let Some(device) = &self.config.device {
+                    self.device_view.update(DeviceViewMessage::ConnectRequest(
+                        device.clone(),
+                        self.config.channel_id.clone(),
+                    ))
+                } else {
+                    Task::none()
+                }
+            }
+            ConfigChange(config_change) => {
+                // Merge in what has changed
+                match config_change {
+                    ConfigChangeMessage::DeviceAndChannel(device, channel) => {
+                        self.config.device = device;
+                        self.config.channel_id = channel;
+                    }
+                }
+                // and save it asynchronously, so that we don't block the GUI thread
+                save_config(self.config.clone())
+            }
             RemoveNotification(id) => {
                 self.remove_notification(id);
                 Task::none()
@@ -146,6 +165,14 @@ impl MeshChat {
                 let maps_url = format!("https://maps.google.com/?q={},{}", lat, long);
                 let _ = webbrowser::open(&maps_url);
                 Task::none()
+            }
+            ToggleNodeFavourite(node_id) => {
+                // Toggle the favourite status of the node in the config
+                if !self.config.fav_nodes.remove(&node_id) {
+                    let _ = self.config.fav_nodes.insert(node_id);
+                }
+                // and save the config asynchronously, so that we don't block the GUI thread
+                save_config(self.config.clone())
             }
         }
     }
@@ -199,7 +226,7 @@ impl MeshChat {
         // Build the inner view and show busy if in DeviceList which is in discovery mode
         let (inner, scanning) = match self.current_view {
             DeviceList => (self.device_list_view.view(state), true),
-            View::Device => (self.device_view.view(), false),
+            View::Device => (self.device_view.view(&self.config), false),
         };
 
         let header = self.header(state, scanning);

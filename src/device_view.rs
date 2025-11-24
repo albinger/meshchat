@@ -1,4 +1,5 @@
-use crate::Message::{Device, Navigation};
+use crate::ConfigChangeMessage::DeviceAndChannel;
+use crate::Message::{Device, Navigation, ToggleNodeFavourite};
 use crate::channel_view::ChannelId::Node;
 use crate::channel_view::{ChannelId, ChannelView, ChannelViewMessage};
 use crate::channel_view_entry::ChannelViewEntry;
@@ -14,7 +15,7 @@ use crate::device_subscription::{SubscriberMessage, SubscriptionEvent};
 use crate::device_view::ConnectionState::{Connected, Connecting, Disconnected, Disconnecting};
 use crate::device_view::DeviceViewMessage::{
     ChannelMsg, ConnectRequest, DisconnectRequest, SearchInput, SendMessage, ShowChannel,
-    SubscriptionMessage, ToggleNodeFavourite,
+    SubscriptionMessage,
 };
 use crate::styles::{
     DAY_SEPARATOR_STYLE, NO_BORDER, NO_SHADOW, VIEW_BUTTON_BORDER, button_chip_style,
@@ -35,7 +36,7 @@ use meshtastic::protobufs::mesh_packet::PayloadVariant::Decoded;
 use meshtastic::protobufs::telemetry::Variant::DeviceMetrics;
 use meshtastic::protobufs::{Channel, FromRadio, MeshPacket, NodeInfo, PortNum};
 use meshtastic::utils::stream::BleDevice;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use tokio::sync::mpsc::Sender;
 
 const VIEW_BUTTON_HOVER_STYLE: Style = Style {
@@ -67,7 +68,6 @@ pub enum DeviceViewMessage {
     DisconnectRequest(BleDevice, bool), // bool is to exit or not
     SubscriptionMessage(SubscriptionEvent),
     ShowChannel(Option<ChannelId>),
-    ToggleNodeFavourite(u32),
     ChannelMsg(ChannelViewMessage),
     SendMessage(String, ChannelId),
     SearchInput(String),
@@ -84,7 +84,6 @@ pub struct DeviceView {
     // DeviceMetrics: battery level - in device list
     // User::long_name, User::short_name, User::hw_model
     nodes: HashMap<u32, NodeInfo>, // all nodes known to the connected radio
-    fav_nodes: HashSet<u32>,
     filter: String,
     exit_pending: bool,
 }
@@ -121,7 +120,6 @@ impl DeviceView {
             channel_views: HashMap::new(),
             filter: String::default(),
             exit_pending: false,
-            fav_nodes: HashSet::new(),
         }
     }
 
@@ -162,10 +160,10 @@ impl DeviceView {
                     let device_clone = device.clone();
                     self.viewing_channel = channel_id;
                     Task::perform(empty(), move |_| {
-                        Message::SaveConfig(Config {
-                            device: Some(device_clone.clone()),
-                            channel_id: channel_id_clone.clone(),
-                        })
+                        Message::ConfigChange(DeviceAndChannel(
+                            Some(device_clone.clone()),
+                            channel_id_clone.clone(),
+                        ))
                     })
                 } else {
                     Task::none()
@@ -178,10 +176,10 @@ impl DeviceView {
                         None => {
                             let channel_id = self.viewing_channel.clone();
                             Task::perform(empty(), move |_| {
-                                Message::SaveConfig(Config {
-                                    device: Some(device.clone()),
-                                    channel_id: channel_id.clone(),
-                                })
+                                Message::ConfigChange(DeviceAndChannel(
+                                    Some(device.clone()),
+                                    channel_id.clone(),
+                                ))
                             })
                         }
                         Some(channel_id) => {
@@ -235,12 +233,6 @@ impl DeviceView {
             }
             SearchInput(filter) => {
                 self.filter = filter;
-                Task::none()
-            }
-            ToggleNodeFavourite(node_index) => {
-                if !self.fav_nodes.remove(&node_index) {
-                    let _ = self.fav_nodes.insert(node_index);
-                }
                 Task::none()
             }
         }
@@ -536,7 +528,7 @@ impl DeviceView {
         header.into()
     }
 
-    pub fn view(&self) -> Element<'static, Message> {
+    pub fn view(&self, config: &Config) -> Element<'static, Message> {
         if let Some(channel_number) = &self.viewing_channel {
             // && let Some((_channel, packets)) = &self.channels.get(channel_number as usize)
             if let Some(channel_view) = self.channel_views.get(channel_number) {
@@ -571,10 +563,10 @@ impl DeviceView {
             channels_list = channels_list.push(channel_row);
         }
 
-        if !self.fav_nodes.is_empty() {
+        if !config.fav_nodes.is_empty() {
             channels_list = channels_list.push(self.section_header("Favourite Nodes"));
         }
-        for fav_node_id in &self.fav_nodes {
+        for fav_node_id in &config.fav_nodes {
             let node_name = self.node_name(*fav_node_id);
 
             // If there is a filter and the Username does not contain it, don't show this row
@@ -583,22 +575,21 @@ impl DeviceView {
             }
 
             let channel_id = Node(*fav_node_id);
-
-            channels_list = channels_list.push(Self::node_row(
-                node_name,
-                self.channel_views
-                    .get(&channel_id)
-                    .unwrap()
-                    .num_unseen_messages(),
-                *fav_node_id,
-                true, // Favourite
-            ));
+            // We might not have received this channel yet
+            if let Some(channel_view) = self.channel_views.get(&channel_id) {
+                channels_list = channels_list.push(Self::node_row(
+                    node_name,
+                    channel_view.num_unseen_messages(),
+                    *fav_node_id,
+                    true, // Favourite
+                ));
+            }
         }
 
         if !self
             .nodes
             .keys()
-            .filter(|node_id| !self.fav_nodes.contains(node_id))
+            .filter(|node_id| !config.fav_nodes.contains(node_id))
             .collect::<Vec<_>>()
             .is_empty()
         {
@@ -608,7 +599,7 @@ impl DeviceView {
         for node_id in self
             .nodes
             .keys()
-            .filter(|node_id| !self.fav_nodes.contains(node_id))
+            .filter(|node_id| !config.fav_nodes.contains(node_id))
         {
             let node_name = self.node_name(*node_id);
 
@@ -706,12 +697,12 @@ impl DeviceView {
     fn node_row(
         name: String,
         num_messages: usize,
-        node_index: u32,
+        node_id: u32,
         favourite: bool,
     ) -> Element<'static, Message> {
         let row = Row::new().push(
             button(text(format!("{} ({})", name, num_messages)).shaping(Advanced))
-                .on_press(Device(ShowChannel(Some(Node(node_index)))))
+                .on_press(Device(ShowChannel(Some(Node(node_id)))))
                 .width(Fill)
                 .style(Self::view_button),
         );
@@ -719,14 +710,14 @@ impl DeviceView {
         if favourite {
             row.push(
                 button(icons::star())
-                    .on_press(Device(ToggleNodeFavourite(node_index)))
-                    .style(|theme, status| fav_button_style(theme, status)),
+                    .on_press(ToggleNodeFavourite(node_id))
+                    .style(fav_button_style),
             )
         } else {
             row.push(
                 button(icons::star_empty())
-                    .on_press(Device(ToggleNodeFavourite(node_index)))
-                    .style(|theme, status| fav_button_style(theme, status)),
+                    .on_press(ToggleNodeFavourite(node_id))
+                    .style(fav_button_style),
             )
         }
         .push(Space::with_width(10))
