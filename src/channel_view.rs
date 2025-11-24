@@ -324,7 +324,7 @@ impl ChannelView {
                     .on_press(ShowLocation(latitude, longitude))
                     .into()
             }
-            Ping(_) => text("Ping!")
+            Ping(user_name) => text(format!("Ping from {}", user_name))
                 .style(|_| MESSAGE_TEXT_STYLE)
                 .size(18)
                 .shaping(Advanced)

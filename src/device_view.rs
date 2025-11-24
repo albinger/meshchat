@@ -432,7 +432,7 @@ impl DeviceView {
                     let seen = self.viewing_channel == Some(channel_id.clone());
                     if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
                         let new_message = ChannelViewEntry::new(
-                            Ping(user.short_name),
+                            Ping(user.id),
                             mesh_packet.from,
                             mesh_packet.id,
                             name,

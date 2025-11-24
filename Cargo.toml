@@ -7,7 +7,15 @@ readme = "README.md"
 repository = "https://github.com/andrewdavidmackenzie/meshchat"
 license = "LICENCE"
 include = ["assets/fonts/icons.ttf"]
-exclude = ["assets/fonts/icons.toml"]
+build = "build.rs"
+
+[[bin]]
+name = "meshchat"
+path = "src/main.rs"
+
+[features]
+default = []
+debug = ["iced/debug"] # use "... --features "debug" to enable this for Iced
 
 [dependencies]
 # For communications with BLE connected radios running meshtastic firmware
@@ -38,10 +46,6 @@ webbrowser = { version = "1.0", default-features = false }
 
 [build-dependencies]
 iced_fontello = "0.13"
-
-[features]
-default = []
-debug = ["iced/debug"] # use "... --features "debug" to enable this for Iced
 
 # With the standard release profile, binary size was: 10,756,272 (10.7MB)
 # With these changes the binary size reduced to: 5,596,848 (5.56MB)
