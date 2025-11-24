@@ -31,7 +31,9 @@ mod device_view;
 mod easing;
 mod linear;
 mod styles;
-// mod router;
+
+/// Icons generated as a font using iced_fontello
+mod icons;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum View {
@@ -79,6 +81,7 @@ fn main() -> iced::Result {
         .subscription(MeshChat::subscription)
         .exit_on_close_request(false)
         .resizable(true)
+        .font(icons::FONT)
         .run_with(MeshChat::new)
 }
 
