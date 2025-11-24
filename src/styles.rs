@@ -241,6 +241,35 @@ pub fn transparent_button_style(
     style
 }
 
+pub fn fav_button_style(_theme: &Theme, status: button::Status) -> button::Style {
+    match status {
+        button::Status::Active => button::Style {
+            background: Some(Background::Color(Color::TRANSPARENT)),
+            text_color: Color::WHITE,
+            border: NO_BORDER,
+            shadow: NO_SHADOW,
+        },
+        button::Status::Hovered => button::Style {
+            background: Some(Background::Color(CYAN)),
+            text_color: Color::WHITE,
+            border: BUTTON_BORDER_ACTIVE,
+            shadow: NO_SHADOW,
+        },
+        button::Status::Pressed => button::Style {
+            background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.8, 1.0))),
+            text_color: Color::WHITE,
+            border: BUTTON_BORDER_ACTIVE,
+            shadow: NO_SHADOW,
+        },
+        button::Status::Disabled => button::Style {
+            background: Some(Background::Color(Color::TRANSPARENT)),
+            text_color: Color::WHITE,
+            border: BUTTON_BORDER_DISABLED,
+            shadow: NO_SHADOW,
+        },
+    }
+}
+
 pub fn button_chip_style(_theme: &Theme, status: button::Status) -> button::Style {
     match status {
         button::Status::Active => button::Style {

@@ -2,3 +2,5 @@ module = "icons"
 
 [glyphs]
 send = "entypo-mail"
+star = "fontawesome-star"
+star_empty = "fontawesome-star-empty"

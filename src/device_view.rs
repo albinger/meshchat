@@ -1,4 +1,5 @@
 use crate::Message::{Device, Navigation};
+use crate::channel_view::ChannelId::Node;
 use crate::channel_view::{ChannelId, ChannelView, ChannelViewMessage};
 use crate::channel_view_entry::ChannelViewEntry;
 use crate::channel_view_entry::Payload::{
@@ -13,20 +14,18 @@ use crate::device_subscription::{SubscriberMessage, SubscriptionEvent};
 use crate::device_view::ConnectionState::{Connected, Connecting, Disconnected, Disconnecting};
 use crate::device_view::DeviceViewMessage::{
     ChannelMsg, ConnectRequest, DisconnectRequest, SearchInput, SendMessage, ShowChannel,
-    SubscriptionMessage,
+    SubscriptionMessage, ToggleNodeFavourite,
 };
 use crate::styles::{
     DAY_SEPARATOR_STYLE, NO_BORDER, NO_SHADOW, VIEW_BUTTON_BORDER, button_chip_style,
-    text_input_style,
+    fav_button_style, text_input_style,
 };
-use crate::{Message, View};
+use crate::{Message, View, icons};
 use iced::widget::button::Status::Hovered;
 use iced::widget::button::{Status, Style};
 use iced::widget::scrollable::Scrollbar;
 use iced::widget::text::Shaping::Advanced;
-use iced::widget::{
-    Button, Column, Container, Row, Space, button, row, scrollable, text, text_input,
-};
+use iced::widget::{Column, Container, Row, Space, button, row, scrollable, text, text_input};
 use iced::{Background, Center, Color, Element, Fill, Padding, Task, Theme};
 use meshtastic::Message as _;
 use meshtastic::protobufs::channel::Role;
@@ -36,7 +35,7 @@ use meshtastic::protobufs::mesh_packet::PayloadVariant::Decoded;
 use meshtastic::protobufs::telemetry::Variant::DeviceMetrics;
 use meshtastic::protobufs::{Channel, FromRadio, MeshPacket, NodeInfo, PortNum};
 use meshtastic::utils::stream::BleDevice;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use tokio::sync::mpsc::Sender;
 
 const VIEW_BUTTON_HOVER_STYLE: Style = Style {
@@ -68,6 +67,7 @@ pub enum DeviceViewMessage {
     DisconnectRequest(BleDevice, bool), // bool is to exit or not
     SubscriptionMessage(SubscriptionEvent),
     ShowChannel(Option<ChannelId>),
+    ToggleNodeFavourite(u32),
     ChannelMsg(ChannelViewMessage),
     SendMessage(String, ChannelId),
     SearchInput(String),
@@ -77,13 +77,14 @@ pub struct DeviceView {
     connection_state: ConnectionState,
     subscription_sender: Option<Sender<SubscriberMessage>>, // TODO Maybe combine with Disconnected state?
     my_node_num: Option<u32>,
+    pub(crate) viewing_channel: Option<ChannelId>,
+    channel_views: HashMap<ChannelId, ChannelView>,
     pub(crate) channels: Vec<Channel>,
     // TODO elements of NodeInfo I could use
     // DeviceMetrics: battery level - in device list
     // User::long_name, User::short_name, User::hw_model
     nodes: HashMap<u32, NodeInfo>, // all nodes known to the connected radio
-    pub(crate) viewing_channel: Option<ChannelId>,
-    channel_views: HashMap<ChannelId, ChannelView>,
+    fav_nodes: HashSet<u32>,
     filter: String,
     exit_pending: bool,
 }
@@ -120,6 +121,7 @@ impl DeviceView {
             channel_views: HashMap::new(),
             filter: String::default(),
             exit_pending: false,
+            fav_nodes: HashSet::new(),
         }
     }
 
@@ -235,6 +237,12 @@ impl DeviceView {
                 self.filter = filter;
                 Task::none()
             }
+            ToggleNodeFavourite(node_index) => {
+                if !self.fav_nodes.remove(&node_index) {
+                    let _ = self.fav_nodes.insert(node_index);
+                }
+                Task::none()
+            }
         }
     }
 
@@ -279,7 +287,7 @@ impl DeviceView {
             && !node_info.is_ignored
             && node_info.user.is_some()
         {
-            let channel_id = ChannelId::Node(node_info.num);
+            let channel_id = Node(node_info.num);
             self.nodes.insert(node_info.num, node_info);
             self.channel_views.insert(
                 channel_id.clone(),
@@ -315,10 +323,10 @@ impl DeviceView {
             // Destined for a Node
             if Some(mesh_packet.from) == self.my_node_num {
                 // from me to a node - put it in that node's channel
-                ChannelId::Node(mesh_packet.to)
+                Node(mesh_packet.to)
             } else {
                 // from the other node, put it in that node's channel
-                ChannelId::Node(mesh_packet.from)
+                Node(mesh_packet.from)
             }
         }
     }
@@ -331,7 +339,7 @@ impl DeviceView {
                     let channel_id = if mesh_packet.from == mesh_packet.to {
                         ChannelId::Channel(mesh_packet.channel as i32)
                     } else {
-                        ChannelId::Node(mesh_packet.from)
+                        Node(mesh_packet.from)
                     };
                     if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
                         channel_view.ack(data.request_id)
@@ -507,7 +515,7 @@ impl DeviceView {
                         .push(button(text(channel_name).shaping(Advanced)).style(button_chip_style))
                 }
             }
-            Some(ChannelId::Node(node_id)) => {
+            Some(Node(node_id)) => {
                 header = header.push(
                     button(text(self.node_name(*node_id)).shaping(Advanced))
                         .style(button_chip_style),
@@ -563,19 +571,18 @@ impl DeviceView {
             channels_list = channels_list.push(channel_row);
         }
 
-        if !self.nodes.is_empty() {
-            channels_list = channels_list.push(self.section_header("Nodes"));
+        if !self.fav_nodes.is_empty() {
+            channels_list = channels_list.push(self.section_header("Favourite Nodes"));
         }
-        // We only store Nodes that have a valid user set
-        for node_id in self.nodes.keys() {
-            let node_name = self.node_name(*node_id);
+        for fav_node_id in &self.fav_nodes {
+            let node_name = self.node_name(*fav_node_id);
 
             // If there is a filter and the Username does not contain it, don't show this row
             if !self.filter.is_empty() && !node_name.contains(&self.filter) {
                 continue;
             }
 
-            let channel_id = ChannelId::Node(*node_id);
+            let channel_id = Node(*fav_node_id);
 
             channels_list = channels_list.push(Self::node_row(
                 node_name,
@@ -583,9 +590,44 @@ impl DeviceView {
                     .get(&channel_id)
                     .unwrap()
                     .num_unseen_messages(),
-                channel_id,
+                *fav_node_id,
+                true, // Favourite
             ));
-            // TODO mark as a favourite if has is_favorite set
+        }
+
+        if !self
+            .nodes
+            .keys()
+            .filter(|node_id| !self.fav_nodes.contains(node_id))
+            .collect::<Vec<_>>()
+            .is_empty()
+        {
+            channels_list = channels_list.push(self.section_header("Nodes"));
+        }
+        // We only store Nodes that have a valid user set
+        for node_id in self
+            .nodes
+            .keys()
+            .filter(|node_id| !self.fav_nodes.contains(node_id))
+        {
+            let node_name = self.node_name(*node_id);
+
+            // If there is a filter and the Username does not contain it, don't show this row
+            if !self.filter.is_empty() && !node_name.contains(&self.filter) {
+                continue;
+            }
+
+            let channel_id = Node(*node_id);
+
+            channels_list = channels_list.push(Self::node_row(
+                node_name,
+                self.channel_views
+                    .get(&channel_id)
+                    .unwrap()
+                    .num_unseen_messages(),
+                *node_id,
+                false, // Not a Favourite
+            ));
         }
 
         let channel_and_user_scroll = scrollable(channels_list)
@@ -649,23 +691,46 @@ impl DeviceView {
         name: String,
         num_messages: usize,
         channel_id: ChannelId,
-    ) -> Button<'static, Message> {
-        button(text(format!("{} ({})", name, num_messages)).shaping(Advanced))
-            .on_press(Device(ShowChannel(Some(channel_id))))
-            .width(Fill)
-            .style(Self::view_button)
+    ) -> Element<'static, Message> {
+        Row::new()
+            .push(
+                button(text(format!("{} ({})", name, num_messages)).shaping(Advanced))
+                    .on_press(Device(ShowChannel(Some(channel_id))))
+                    .width(Fill)
+                    .style(Self::view_button),
+            )
+            .push(Space::with_width(10))
+            .into()
     }
 
     fn node_row(
         name: String,
         num_messages: usize,
-        channel_id: ChannelId,
-    ) -> Button<'static, Message> {
-        let row_text = format!("{} ({})", name, num_messages);
-        button(text(row_text).shaping(Advanced))
-            .on_press(Device(ShowChannel(Some(channel_id))))
-            .width(Fill)
-            .style(Self::view_button)
+        node_index: u32,
+        favourite: bool,
+    ) -> Element<'static, Message> {
+        let row = Row::new().push(
+            button(text(format!("{} ({})", name, num_messages)).shaping(Advanced))
+                .on_press(Device(ShowChannel(Some(Node(node_index)))))
+                .width(Fill)
+                .style(Self::view_button),
+        );
+
+        if favourite {
+            row.push(
+                button(icons::star())
+                    .on_press(Device(ToggleNodeFavourite(node_index)))
+                    .style(|theme, status| fav_button_style(theme, status)),
+            )
+        } else {
+            row.push(
+                button(icons::star_empty())
+                    .on_press(Device(ToggleNodeFavourite(node_index)))
+                    .style(|theme, status| fav_button_style(theme, status)),
+            )
+        }
+        .push(Space::with_width(10))
+        .into()
     }
 
     fn search_box(&self) -> Element<'static, Message> {
