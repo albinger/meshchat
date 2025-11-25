@@ -1,6 +1,6 @@
 use crate::Message::{Device, ShowLocation};
 use crate::channel_view::ChannelId::Channel;
-use crate::channel_view::ChannelViewMessage::{ClearMessage, MessageInput};
+use crate::channel_view::ChannelViewMessage::{ClearMessage, MessageInput, SendMessage};
 use crate::channel_view_entry::Payload::{
     EmojiReply, NewTextMessage, Ping, Position, TextMessageReply,
 };
@@ -135,7 +135,9 @@ impl ChannelView {
     pub fn update(&mut self, channel_view_message: ChannelViewMessage) -> Task<Message> {
         match channel_view_message {
             MessageInput(s) => {
-                self.message = s;
+                if s.len() < 200 {
+                    self.message = s;
+                }
                 Task::none()
             }
             ClearMessage => {
@@ -143,7 +145,7 @@ impl ChannelView {
                 self.message = String::new();
                 Task::none()
             }
-            ChannelViewMessage::SendMessage => {
+            SendMessage => {
                 if !self.message.is_empty() {
                     let msg = self.message.clone();
                     self.message = String::new();
@@ -240,9 +242,12 @@ impl ChannelView {
         let mut send_button = button(icons::send().size(18))
             .style(button_chip_style)
             .padding(Padding::from([6, 6]));
-
+        let mut clear_button = button(text("X").size(18))
+            .style(button_chip_style)
+            .padding(Padding::from([6, 6]));
         if !self.message.is_empty() {
-            send_button = send_button.on_press(Device(ChannelMsg(ChannelViewMessage::SendMessage)));
+            send_button = send_button.on_press(Device(ChannelMsg(SendMessage)));
+            clear_button = clear_button.on_press(Device(ChannelMsg(ClearMessage)));
         }
 
         Row::new()
@@ -251,7 +256,7 @@ impl ChannelView {
                 text_input("Send Message", &self.message)
                     .style(text_input_style)
                     .on_input(|s| Device(ChannelMsg(MessageInput(s))))
-                    .on_submit(Device(ChannelMsg(ChannelViewMessage::SendMessage)))
+                    .on_submit(Device(ChannelMsg(SendMessage)))
                     .padding([6, 6])
                     .icon(Icon {
                         font: Font::with_name("icons"),
@@ -261,6 +266,8 @@ impl ChannelView {
                         side: Side::Left,
                     }),
             )
+            .push(Space::with_width(4.0))
+            .push(clear_button)
             .push(Space::with_width(4.0))
             .push(send_button)
             .into()
