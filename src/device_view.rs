@@ -512,7 +512,7 @@ impl DeviceView {
             }
             Some(Node(node_id)) => {
                 header = header.push(
-                    button(text(self.node_name(*node_id)).shaping(Advanced))
+                    button(text(self.node_name(*node_id).unwrap()).shaping(Advanced))
                         .style(button_chip_style),
                 )
             }
@@ -566,62 +566,57 @@ impl DeviceView {
             channels_list = channels_list.push(channel_row);
         }
 
-        if !config.fav_nodes.is_empty() {
-            channels_list = channels_list.push(self.section_header("Favourite Nodes"));
-        }
+        // Construct list of favourite nodes
+        let mut fav_nodes: Vec<(u32, String)> = vec![];
+
         for fav_node_id in &config.fav_nodes {
-            let node_name = self.node_name(*fav_node_id);
-
-            // If there is a filter and the Username does not contain it, don't show this row
-            if !self.filter.is_empty() && !node_name.contains(&self.filter) {
-                continue;
-            }
-
-            let channel_id = Node(*fav_node_id);
-            // We might not have received this channel yet
-            if let Some(channel_view) = self.channel_views.get(&channel_id) {
-                channels_list = channels_list.push(Self::node_row(
-                    node_name,
-                    channel_view.num_unseen_messages(),
-                    *fav_node_id,
-                    true, // Favourite
-                ));
+            if let Some(node_name) = self.node_name(*fav_node_id) {
+                // If there is a filter and the Username does not contain it, don't show this row
+                if node_name.contains(&self.filter) {
+                    fav_nodes.push((*fav_node_id, node_name));
+                }
             }
         }
 
-        if !self
+        // If there are favourite nodes, show the header and list them
+        if !fav_nodes.is_empty() {
+            channels_list = channels_list.push(self.section_header("Favourite Nodes"));
+            for (fav_node_id, node_name) in fav_nodes {
+                let channel_id = Node(fav_node_id);
+                if let Some(channel_view) = self.channel_views.get(&channel_id) {
+                    channels_list = channels_list.push(Self::node_row(
+                        node_name,
+                        channel_view.num_unseen_messages(),
+                        fav_node_id,
+                        true, // Favourite
+                    ));
+                }
+            }
+        }
+
+        let node_list = self
             .nodes
             .keys()
             .filter(|node_id| !config.fav_nodes.contains(node_id))
-            .collect::<Vec<_>>()
-            .is_empty()
-        {
+            .collect::<Vec<_>>();
+        if !node_list.is_empty() {
             channels_list = channels_list.push(self.section_header("Nodes"));
-        }
-        // We only store Nodes that have a valid user set
-        for node_id in self
-            .nodes
-            .keys()
-            .filter(|node_id| !config.fav_nodes.contains(node_id))
-        {
-            let node_name = self.node_name(*node_id);
 
-            // If there is a filter and the Username does not contain it, don't show this row
-            if !self.filter.is_empty() && !node_name.contains(&self.filter) {
-                continue;
+            for node_id in node_list {
+                if let Some(node_name) = self.node_name(*node_id) {
+                    let channel_id = Node(*node_id);
+
+                    channels_list = channels_list.push(Self::node_row(
+                        node_name,
+                        self.channel_views
+                            .get(&channel_id)
+                            .unwrap()
+                            .num_unseen_messages(),
+                        *node_id,
+                        false, // Not a Favourite
+                    ));
+                }
             }
-
-            let channel_id = Node(*node_id);
-
-            channels_list = channels_list.push(Self::node_row(
-                node_name,
-                self.channel_views
-                    .get(&channel_id)
-                    .unwrap()
-                    .num_unseen_messages(),
-                *node_id,
-                false, // Not a Favourite
-            ));
         }
 
         let channel_and_user_scroll = scrollable(channels_list)
@@ -638,7 +633,7 @@ impl DeviceView {
             .into()
     }
 
-    /// Add a section header between areas of the list of channels and users
+    /// Add a section header between areas of the list
     fn section_header(&self, title: &'static str) -> Element<'static, Message> {
         Column::new()
             .push(
@@ -662,14 +657,12 @@ impl DeviceView {
         format!("🛜  {}", name)
     }
 
-    /// Return a name for the node with id node_id - prefixed with a node/device emoji
-    fn node_name(&self, node_id: u32) -> String {
-        let name = self
-            .nodes
-            .get(&node_id)
-            .map(|node_info| node_info.user.as_ref().unwrap().long_name.as_ref())
-            .unwrap_or("");
-        format!("📱  {}", name)
+    /// Return the long name for the node with id node_id - prefixed with a node/device emoji -
+    /// if the node is known and has a name
+    fn node_name(&self, node_id: u32) -> Option<String> {
+        let node = self.nodes.get(&node_id)?;
+        let user = node.user.as_ref()?;
+        Some(format!("📱  {}", &user.long_name))
     }
 
     fn view_button(_: &Theme, status: Status) -> Style {
