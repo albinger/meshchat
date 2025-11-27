@@ -463,13 +463,16 @@ impl DeviceView {
             .map(|node_info| node_info.user.as_ref().unwrap().short_name.clone())
     }
 
-    pub fn device_view_header<'a>(
-        &'a self,
-        connection_state: &'a ConnectionState,
-    ) -> Element<'a, Message> {
-        let mut header: Row<Message> = Row::new();
+    /// Create a header view for the top of the screen depending on the current state of the app
+    /// and whether we are in discovery mode or not.
+    pub fn header<'a>(&'a self, state: &'a ConnectionState) -> Element<'a, Message> {
+        let mut header = Row::new().align_y(Bottom).push(
+            button("Devices")
+                .style(button_chip_style)
+                .on_press(Navigation(DeviceList)),
+        );
 
-        header = match connection_state {
+        header = match state {
             Disconnected(_, _) => header
                 .push(Space::with_width(Fill))
                 .push(button("Disconnected").style(button_chip_style)),
@@ -524,7 +527,7 @@ impl DeviceView {
         }
 
         // Add a disconnect button on the right if we are connected
-        if let Connected(device) = connection_state {
+        if let Connected(device) = state {
             header = header.push(Space::new(Fill, 1)).push(
                 button("Disconnect")
                     .on_press(Device(DisconnectRequest(device.clone(), false)))
@@ -533,22 +536,6 @@ impl DeviceView {
         }
 
         header.into()
-    }
-
-    /// Create a header view for the top of the screen depending on the current state of the app
-    /// and whether we are in discovery mode or not.
-    pub fn header<'a>(&'a self, state: &'a ConnectionState) -> Element<'a, Message> {
-        // Always add a button to allow navigating back to the list of devices
-        let device_list_button = button("Devices")
-            .style(button_chip_style)
-            .on_press(Navigation(DeviceList));
-
-        // Create the navigation bar and add it to the header
-        Row::new()
-            .align_y(Bottom)
-            .push(device_list_button)
-            .push(self.device_view_header(state))
-            .into()
     }
 
     pub fn view(&self, config: &Config) -> Element<'_, Message> {
