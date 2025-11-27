@@ -35,6 +35,7 @@ pub enum Payload {
 
 /// An entry in the Channel View that represents some type of message sent to either this user on
 /// this device or to a channel this device can read. Can be any of [Payload] types.
+#[allow(dead_code)] // Remove when the 'seen' field is used
 #[derive(Clone, Debug)]
 pub struct ChannelViewEntry {
     from: u32,
@@ -316,7 +317,6 @@ impl ChannelViewEntry {
                 bottom: 6.0,
                 left: 6.0,
             });
-            // TODO Style the tooltip
             for (emoji, sources) in self.emojis() {
                 let tooltip_element: Element<'_, Message> = Self::list_of_nodes(sources);
                 emoji_row = emoji_row.push(
