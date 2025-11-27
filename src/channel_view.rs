@@ -96,14 +96,10 @@ impl ChannelView {
     }
 
     /// Return the text of a NewTextMessage that matches the given id, or None if not found
-    fn text_from_id(&self, id: u32) -> Option<String> {
-        self.entries.get(&id).and_then(|entry| {
-            if let NewTextMessage(text_message) = entry.payload() {
-                Some(text_message.clone())
-            } else {
-                None
-            }
-        })
+    fn text_from_id(&self, id: u32) -> Option<&String> {
+        self.entries
+            .get(&id)
+            .and_then(|entry| entry.as_new_message())
     }
 
     /// Add a new [ChannelViewEntry] message to the [ChannelView]
@@ -166,7 +162,7 @@ impl ChannelView {
     }
 
     /// Construct an Element that displays the channel view
-    pub fn view(&self) -> Element<'static, Message> {
+    pub fn view(&self) -> Element<'_, Message> {
         let mut channel_view = Column::new().padding(right(10));
 
         let mut previous_day = u32::MIN;
@@ -277,7 +273,11 @@ impl ChannelView {
     }
 
     /// Create an Element that contains a message received or sent
-    fn message_box(&self, message: &ChannelViewEntry, mine: bool) -> Element<'static, Message> {
+    fn message_box<'a>(
+        &'a self,
+        message: &'a ChannelViewEntry,
+        mine: bool,
+    ) -> Element<'a, Message> {
         // Add the source node name if there is one
         // TODO try and show the full node name in the tooltip
         let mut message_content_column = Column::new();

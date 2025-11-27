@@ -531,7 +531,7 @@ impl DeviceView {
         header.into()
     }
 
-    pub fn view(&self, config: &Config) -> Element<'static, Message> {
+    pub fn view(&self, config: &Config) -> Element<'_, Message> {
         if let Some(channel_number) = &self.viewing_channel {
             // && let Some((_channel, packets)) = &self.channels.get(channel_number as usize)
             if let Some(channel_view) = self.channel_views.get(channel_number) {

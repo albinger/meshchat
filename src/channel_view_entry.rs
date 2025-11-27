@@ -1,3 +1,4 @@
+use crate::channel_view_entry::Payload::NewTextMessage;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -54,6 +55,14 @@ impl ChannelViewEntry {
             seen,
             acked: false,
             emoji_reply: HashMap::new(),
+        }
+    }
+
+    pub fn as_new_message(&self) -> Option<&String> {
+        if let NewTextMessage(text_message) = self.payload() {
+            Some(text_message)
+        } else {
+            None
         }
     }
 
