@@ -6,7 +6,8 @@ use crate::device_view::DeviceViewMessage::{ConnectRequest, DisconnectRequest};
 use crate::styles::button_chip_style;
 use crate::{Message, View, name_from_id};
 use iced::futures::{SinkExt, Stream};
-use iced::widget::{Column, Row, Space, button, container, text};
+use iced::widget::scrollable::Scrollbar;
+use iced::widget::{Column, Row, Space, button, container, scrollable, text};
 use iced::{Bottom, stream};
 use iced::{Element, Fill, Task, alignment};
 use meshtastic::utils::stream::{BleDevice, available_ble_devices};
@@ -95,7 +96,6 @@ impl DeviceListView {
 
     pub fn view(&self, connection_state: &ConnectionState) -> Element<'static, Message> {
         let mut main_col = Column::new();
-        // TODO add a scrollable area in case there are a lot of devices
 
         for device in &self.discovered_devices {
             let mut device_row = Row::new().align_y(alignment::Vertical::Center);
@@ -130,9 +130,18 @@ impl DeviceListView {
             main_col = main_col.push(device_row);
         }
 
-        container(main_col)
+        let scroll = scrollable(main_col)
+            .direction({
+                let scrollbar = Scrollbar::new().width(10.0);
+                scrollable::Direction::Vertical(scrollbar)
+            })
+            .width(Fill)
+            .height(Fill);
+
+        container(scroll)
             .height(Fill)
             .width(Fill)
+            .padding(4)
             .align_x(alignment::Horizontal::Left)
             .into()
     }
