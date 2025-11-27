@@ -19,16 +19,13 @@ use crate::device_view::DeviceViewMessage::{
     SubscriptionMessage,
 };
 use crate::styles::{
-    DAY_SEPARATOR_STYLE, NO_BORDER, NO_SHADOW, VIEW_BUTTON_BORDER, button_chip_style,
-    fav_button_style, text_input_style,
+    DAY_SEPARATOR_STYLE, button_chip_style, channel_row_style, fav_button_style, text_input_style,
 };
 use crate::{Message, View, icons};
-use iced::widget::button::Status::Hovered;
-use iced::widget::button::{Status, Style};
 use iced::widget::scrollable::Scrollbar;
 use iced::widget::text::Shaping::Advanced;
 use iced::widget::{Column, Container, Row, Space, button, row, scrollable, text, text_input};
-use iced::{Background, Bottom, Center, Color, Element, Fill, Padding, Task, Theme};
+use iced::{Bottom, Center, Element, Fill, Padding, Task};
 use meshtastic::Message as _;
 use meshtastic::protobufs::channel::Role;
 use meshtastic::protobufs::channel::Role::*;
@@ -40,23 +37,8 @@ use meshtastic::utils::stream::BleDevice;
 use std::collections::HashMap;
 use tokio::sync::mpsc::Sender;
 
-const VIEW_BUTTON_HOVER_STYLE: Style = Style {
-    background: Some(Background::Color(Color::from_rgba(0.0, 0.8, 0.8, 1.0))),
-    text_color: Color::BLACK,
-    border: VIEW_BUTTON_BORDER,
-    shadow: NO_SHADOW,
-};
-
-const VIEW_BUTTON_STYLE: Style = Style {
-    background: Some(Background::Color(Color::from_rgba(0.0, 1.0, 1.0, 0.0))),
-    text_color: Color::WHITE,
-    border: NO_BORDER,
-    shadow: NO_SHADOW,
-};
-
 #[derive(Clone, PartialEq)]
 pub enum ConnectionState {
-    #[allow(dead_code)] // Remove this when the optional error string is used
     Disconnected(Option<BleDevice>, Option<String>),
     Connecting(BleDevice),
     Connected(BleDevice),
@@ -76,7 +58,7 @@ pub enum DeviceViewMessage {
 
 pub struct DeviceView {
     connection_state: ConnectionState,
-    subscription_sender: Option<Sender<SubscriberMessage>>, // TODO Maybe combine with Disconnected state?
+    subscription_sender: Option<Sender<SubscriberMessage>>,
     my_node_num: Option<u32>,
     pub(crate) viewing_channel: Option<ChannelId>,
     channel_views: HashMap<ChannelId, ChannelView>,
@@ -124,6 +106,7 @@ impl DeviceView {
         }
     }
 
+    /// Get the current [ConnectionState] of this device
     pub fn connection_state(&self) -> &ConnectionState {
         &self.connection_state
     }
@@ -152,7 +135,7 @@ impl DeviceView {
                 // Send a message to the subscription to disconnect
                 let sender = self.subscription_sender.clone();
                 Task::perform(request_disconnection(sender.unwrap()), |_| {
-                    Navigation(View::DeviceList)
+                    Navigation(DeviceList)
                 })
             }
             ShowChannel(channel_id) => {
@@ -201,7 +184,7 @@ impl DeviceView {
                     self.channels.clear();
                     self.my_node_num = None;
                     self.viewing_channel = None;
-                    Task::perform(empty(), |_| Navigation(View::DeviceList))
+                    Task::perform(empty(), |_| Navigation(DeviceList))
                 }
                 Ready(sender) => {
                     self.subscription_sender = Some(sender);
@@ -211,7 +194,7 @@ impl DeviceView {
                 DeviceMeshPacket(packet) => self.handle_mesh_packet(&packet),
                 ConnectionError(id, summary, detail) => {
                     self.connection_state = Disconnected(Some(id), Some(summary.clone()));
-                    Task::perform(empty(), |_| Navigation(View::DeviceList))
+                    Task::perform(empty(), |_| Navigation(DeviceList))
                         .chain(Self::report_error(summary.clone(), detail.clone()))
                 }
             },
@@ -672,14 +655,6 @@ impl DeviceView {
         Some(format!("📱  {}", &user.long_name))
     }
 
-    fn view_button(_: &Theme, status: Status) -> Style {
-        if status == Hovered {
-            VIEW_BUTTON_HOVER_STYLE
-        } else {
-            VIEW_BUTTON_STYLE
-        }
-    }
-
     /// Create a Button that represents either a Channel or a Node
     fn channel_button(
         name: String,
@@ -691,7 +666,7 @@ impl DeviceView {
                 button(text(format!("{} ({})", name, num_messages)).shaping(Advanced))
                     .on_press(DeviceViewEvent(ShowChannel(Some(channel_id))))
                     .width(Fill)
-                    .style(Self::view_button),
+                    .style(channel_row_style),
             )
             .push(Space::with_width(10))
             .into()
@@ -707,7 +682,7 @@ impl DeviceView {
             button(text(format!("{} ({})", name, num_messages)).shaping(Advanced))
                 .on_press(DeviceViewEvent(ShowChannel(Some(Node(node_id)))))
                 .width(Fill)
-                .style(Self::view_button),
+                .style(channel_row_style),
         );
 
         if favourite {
