@@ -207,31 +207,27 @@ pub fn source_tooltip_style(_theme: &Theme) -> Style {
     }
 }
 
-pub fn transparent_button_style(
-    _theme: &Theme,
-    status: button::Status,
-    color: Color,
-) -> button::Style {
+pub fn transparent_button_style(_theme: &Theme, status: Status, color: Color) -> button::Style {
     let mut style = match status {
-        button::Status::Active => button::Style {
+        Status::Active => button::Style {
             background: None,
             text_color: Color::WHITE,
             border: NO_BORDER,
             shadow: NO_SHADOW,
         },
-        button::Status::Hovered => button::Style {
+        Hovered => button::Style {
             background: None,
             text_color: Color::WHITE,
             border: NO_BORDER,
             shadow: NO_SHADOW,
         },
-        button::Status::Pressed => button::Style {
+        Status::Pressed => button::Style {
             background: None,
             text_color: Color::WHITE,
             border: NO_BORDER,
             shadow: NO_SHADOW,
         },
-        button::Status::Disabled => button::Style {
+        Status::Disabled => button::Style {
             background: None,
             text_color: Color::WHITE,
             border: NO_BORDER,
