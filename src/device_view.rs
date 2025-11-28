@@ -417,6 +417,7 @@ impl DeviceView {
                     let channel_id = self.channel_id_from_packet(mesh_packet);
                     let seen = self.viewing_channel == Some(channel_id.clone());
                     let name = self.source_name(mesh_packet);
+                    self.update_node_position(mesh_packet.from, &position);
                     if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
                         if let Some(lat) = position.latitude_i
                             && let Some(lon) = position.longitude_i
@@ -482,6 +483,14 @@ impl DeviceView {
         self.nodes
             .get(&mesh_packet.from)
             .map(|node_info| node_info.user.as_ref().unwrap().short_name.clone())
+    }
+
+    /// If the Node is known already, then update its Position with a PositionApp update
+    /// it has sent
+    fn update_node_position(&mut self, from: u32, position: &Position) {
+        if let Some(node) = self.nodes.get_mut(&from) {
+            node.position = Some(*position);
+        }
     }
 
     /// Create a header view for the top of the screen depending on the current state of the app
