@@ -18,7 +18,7 @@ publish: release
 test:
 	cargo test
 
-updeps:
+udeps:
 	cargo +nightly udeps
 
 debug:
