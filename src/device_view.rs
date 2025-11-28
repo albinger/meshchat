@@ -8,15 +8,17 @@ use crate::channel_view_entry::Payload::{
     EmojiReply, NewTextMessage, Ping, Position, TextMessageReply,
 };
 use crate::config::Config;
-use crate::device_subscription::SubscriberMessage::{Connect, Disconnect, SendText};
+use crate::device_subscription::SubscriberMessage::{
+    Connect, Disconnect, SendInfo, SendPosition, SendText,
+};
 use crate::device_subscription::SubscriptionEvent::{
     ConnectedEvent, ConnectionError, DeviceMeshPacket, DevicePacket, DisconnectedEvent, Ready,
 };
 use crate::device_subscription::{SubscriberMessage, SubscriptionEvent};
 use crate::device_view::ConnectionState::{Connected, Connecting, Disconnected, Disconnecting};
 use crate::device_view::DeviceViewMessage::{
-    ChannelMsg, ConnectRequest, DisconnectRequest, SearchInput, SendMessage, ShowChannel,
-    SubscriptionMessage,
+    ChannelMsg, ConnectRequest, DisconnectRequest, SearchInput, SendInfoMessage,
+    SendPositionMessage, SendTextMessage, ShowChannel, SubscriptionMessage,
 };
 use crate::styles::{
     DAY_SEPARATOR_STYLE, button_chip_style, channel_row_style, fav_button_style, text_input_style,
@@ -52,7 +54,9 @@ pub enum DeviceViewMessage {
     SubscriptionMessage(SubscriptionEvent),
     ShowChannel(Option<ChannelId>),
     ChannelMsg(ChannelViewMessage),
-    SendMessage(String, ChannelId),
+    SendTextMessage(String, ChannelId),
+    SendPositionMessage(ChannelId),
+    SendInfoMessage(ChannelId),
     SearchInput(String),
 }
 
@@ -77,6 +81,14 @@ async fn request_connection(sender: Sender<SubscriberMessage>, device: BleDevice
 
 async fn request_send(sender: Sender<SubscriberMessage>, text: String, channel_id: ChannelId) {
     let _ = sender.send(SendText(text, channel_id)).await;
+}
+
+async fn request_send_position(sender: Sender<SubscriberMessage>, channel_id: ChannelId) {
+    let _ = sender.send(SendPosition(channel_id)).await;
+}
+
+async fn request_send_info(sender: Sender<SubscriberMessage>, channel_id: ChannelId) {
+    let _ = sender.send(SendInfo(channel_id)).await;
 }
 
 async fn request_disconnection(sender: Sender<SubscriberMessage>) {
@@ -153,54 +165,24 @@ impl DeviceView {
                     Task::none()
                 }
             }
-            SubscriptionMessage(subscription_event) => match subscription_event {
-                ConnectedEvent(device) => {
-                    self.connection_state = Connected(device.clone());
-                    match &self.viewing_channel {
-                        None => {
-                            let channel_id = self.viewing_channel.clone();
-                            Task::perform(empty(), move |_| {
-                                Message::ConfigChange(DeviceAndChannel(
-                                    Some(device.clone()),
-                                    channel_id.clone(),
-                                ))
-                            })
-                        }
-                        Some(channel_id) => {
-                            let channel_id = channel_id.clone();
-                            Task::perform(empty(), move |_| {
-                                DeviceViewEvent(ShowChannel(Some(channel_id.clone())))
-                            })
-                        }
-                    }
-                }
-                DisconnectedEvent(id) => {
-                    if self.exit_pending {
-                        std::process::exit(0);
-                    }
-                    self.connection_state = Disconnected(Some(id), None);
-                    self.channel_views.clear();
-                    self.nodes.clear();
-                    self.channels.clear();
-                    self.my_node_num = None;
-                    self.viewing_channel = None;
-                    Task::perform(empty(), |_| Navigation(DeviceList))
-                }
-                Ready(sender) => {
-                    self.subscription_sender = Some(sender);
-                    Task::none()
-                }
-                DevicePacket(packet) => self.handle_from_radio(packet),
-                DeviceMeshPacket(packet) => self.handle_mesh_packet(&packet),
-                ConnectionError(id, summary, detail) => {
-                    self.connection_state = Disconnected(Some(id), Some(summary.clone()));
-                    Task::perform(empty(), |_| Navigation(DeviceList))
-                        .chain(Self::report_error(summary.clone(), detail.clone()))
-                }
-            },
-            SendMessage(message, index) => {
+            SubscriptionMessage(subscription_event) => {
+                self.process_subscription_event(subscription_event)
+            }
+            SendTextMessage(message, index) => {
                 let sender = self.subscription_sender.clone();
                 Task::perform(request_send(sender.unwrap(), message, index), |_| {
+                    Message::None
+                })
+            }
+            SendPositionMessage(channel_id) => {
+                let sender = self.subscription_sender.clone();
+                Task::perform(request_send_position(sender.unwrap(), channel_id), |_| {
+                    Message::None
+                })
+            }
+            SendInfoMessage(channel_id) => {
+                let sender = self.subscription_sender.clone();
+                Task::perform(request_send_info(sender.unwrap(), channel_id), |_| {
                     Message::None
                 })
             }
@@ -222,6 +204,57 @@ impl DeviceView {
         }
     }
 
+    /// Process an event sent by the subscription connected to the radio
+    fn process_subscription_event(
+        &mut self,
+        subscription_event: SubscriptionEvent,
+    ) -> Task<Message> {
+        match subscription_event {
+            ConnectedEvent(device) => {
+                self.connection_state = Connected(device.clone());
+                match &self.viewing_channel {
+                    None => {
+                        let channel_id = self.viewing_channel.clone();
+                        Task::perform(empty(), move |_| {
+                            Message::ConfigChange(DeviceAndChannel(
+                                Some(device.clone()),
+                                channel_id.clone(),
+                            ))
+                        })
+                    }
+                    Some(channel_id) => {
+                        let channel_id = channel_id.clone();
+                        Task::perform(empty(), move |_| {
+                            DeviceViewEvent(ShowChannel(Some(channel_id.clone())))
+                        })
+                    }
+                }
+            }
+            DisconnectedEvent(id) => {
+                if self.exit_pending {
+                    std::process::exit(0);
+                }
+                self.connection_state = Disconnected(Some(id), None);
+                self.channel_views.clear();
+                self.nodes.clear();
+                self.channels.clear();
+                self.my_node_num = None;
+                self.viewing_channel = None;
+                Task::perform(empty(), |_| Navigation(DeviceList))
+            }
+            Ready(sender) => {
+                self.subscription_sender = Some(sender);
+                Task::none()
+            }
+            DevicePacket(packet) => self.handle_from_radio(packet),
+            DeviceMeshPacket(packet) => self.handle_mesh_packet(&packet),
+            ConnectionError(id, summary, detail) => {
+                self.connection_state = Disconnected(Some(id), Some(summary.clone()));
+                Task::perform(empty(), |_| Navigation(DeviceList))
+                    .chain(Self::report_error(summary.clone(), detail.clone()))
+            }
+        }
+    }
     /// Handle [FromRadio] packets coming from the radio, forwarded from the device_subscription
     fn handle_from_radio(&mut self, packet: Box<FromRadio>) -> Task<Message> {
         match packet.payload_variant {

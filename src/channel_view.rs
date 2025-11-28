@@ -4,7 +4,8 @@ use crate::channel_view::ChannelViewMessage::{ClearMessage, MessageInput, SendMe
 use crate::channel_view_entry::Payload::{
     EmojiReply, NewTextMessage, Ping, Position, TextMessageReply,
 };
-use crate::device_view::DeviceViewMessage::ChannelMsg;
+use crate::device_view::DeviceViewMessage;
+use crate::device_view::DeviceViewMessage::{ChannelMsg, SendInfoMessage, SendPositionMessage};
 use crate::styles::{DAY_SEPARATOR_STYLE, button_chip_style, text_input_style};
 use crate::{Message, channel_view_entry::ChannelViewEntry, icons};
 use chrono::prelude::DateTime;
@@ -127,7 +128,7 @@ impl ChannelView {
                     self.message = String::new();
                     let channel_id = self.channel_id.clone();
                     Task::perform(empty(), move |_| {
-                        DeviceViewEvent(crate::device_view::DeviceViewMessage::SendMessage(
+                        DeviceViewEvent(DeviceViewMessage::SendTextMessage(
                             msg.clone(),
                             channel_id.clone(),
                         ))
@@ -145,7 +146,7 @@ impl ChannelView {
 
         let mut previous_day = u32::MIN;
 
-        // Add an view to the column for each of the entries in this Channel
+        // Add a view to the column for each of the entries in this Channel
         for entry in self.entries.values() {
             let message_day = entry.time().day();
 
@@ -168,10 +169,26 @@ impl ChannelView {
             .width(Fill)
             .height(Fill);
 
+        // A row of action buttons at the bottom of the channel view
+        let channel_buttons = Row::new()
+            .push(
+                button(text("Send Position"))
+                    .style(button_chip_style)
+                    .on_press(DeviceViewEvent(SendPositionMessage(
+                        self.channel_id.clone(),
+                    ))),
+            )
+            .push(
+                button(text("Send Info"))
+                    .style(button_chip_style)
+                    .on_press(DeviceViewEvent(SendInfoMessage(self.channel_id.clone()))),
+            );
+
         // Place the scrollable in a column, with an input box at the bottom
         Column::new()
             .padding(4)
             .push(channel_scroll)
+            .push(channel_buttons)
             .push(self.input_box())
             .into()
     }

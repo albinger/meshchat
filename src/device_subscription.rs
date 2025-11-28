@@ -1,7 +1,9 @@
 use crate::channel_view::ChannelId;
 use crate::device_name;
 use crate::device_subscription::DeviceState::{Connected, Disconnected};
-use crate::device_subscription::SubscriberMessage::{Connect, Disconnect, RadioPacket, SendText};
+use crate::device_subscription::SubscriberMessage::{
+    Connect, Disconnect, RadioPacket, SendInfo, SendPosition, SendText,
+};
 use crate::device_subscription::SubscriptionEvent::{
     ConnectedEvent, ConnectionError, DeviceMeshPacket, DevicePacket, DisconnectedEvent,
 };
@@ -39,6 +41,8 @@ pub enum SubscriberMessage {
     Connect(BleDevice),
     Disconnect,
     SendText(String, ChannelId),
+    SendPosition(ChannelId),
+    SendInfo(ChannelId),
     RadioPacket(Box<FromRadio>),
 }
 
@@ -161,33 +165,11 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
                             Disconnect => break,
                             SendText(text, channel_id) => {
                                 let mut api = stream_api.take().unwrap();
-                                // TODO handle errors
-                                match channel_id {
-                                    ChannelId::Channel(channel_number) => {
-                                        let _ = api
-                                            .send_text(
-                                                &mut my_router,
-                                                text,
-                                                PacketDestination::Broadcast,
-                                                true,
-                                                MeshChannel::from(channel_number as u32),
-                                            )
-                                            .await;
-                                    }
-                                    ChannelId::Node(node_id) => {
-                                        let _ = api
-                                            .send_text(
-                                                &mut my_router,
-                                                text.clone(),
-                                                PacketDestination::Node(NodeId::from(node_id)),
-                                                true,
-                                                MeshChannel::default(),
-                                            )
-                                            .await;
-                                    }
-                                }
+                                send_message(&mut api, &mut my_router, channel_id, text).await;
                                 let _none = stream_api.replace(api);
                             }
+                            SendPosition(_) => {}
+                            SendInfo(_) => {}
                             RadioPacket(packet) => my_router.handle_from_radio(packet).unwrap(),
                         }
                     }
@@ -204,6 +186,39 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
             }
         }
     })
+}
+
+async fn send_message(
+    stream_api: &mut ConnectedStreamApi,
+    my_router: &mut MyRouter,
+    channel_id: ChannelId,
+    text: String,
+) {
+    // TODO handle errors
+    match channel_id {
+        ChannelId::Channel(channel_number) => {
+            let _ = stream_api
+                .send_text(
+                    my_router,
+                    text,
+                    PacketDestination::Broadcast,
+                    true,
+                    MeshChannel::from(channel_number as u32),
+                )
+                .await;
+        }
+        ChannelId::Node(node_id) => {
+            let _ = stream_api
+                .send_text(
+                    my_router,
+                    text.clone(),
+                    PacketDestination::Node(NodeId::from(node_id)),
+                    true,
+                    MeshChannel::default(),
+                )
+                .await;
+        }
+    }
 }
 
 async fn do_connect(device: &BleDevice) -> Result<(PacketReceiver, ConnectedStreamApi), Error> {

@@ -6,7 +6,7 @@ use crate::channel_view_entry::Payload::{
 };
 use crate::device_view::DeviceViewMessage::ShowChannel;
 use crate::styles::{
-    COLOR_DICTIONARY, COLOR_GREEN, MESSAGE_TEXT_STYLE, MY_MESSAGE_BUBBLE_STYLE,
+    COLOR_BLUE, COLOR_DICTIONARY, COLOR_GREEN, MESSAGE_TEXT_STYLE, MY_MESSAGE_BUBBLE_STYLE,
     OTHERS_MESSAGE_BUBBLE_STYLE, TIME_TEXT_COLOR, TIME_TEXT_SIZE, TIME_TEXT_WIDTH,
     source_tooltip_style, transparent_button_style,
 };
@@ -244,7 +244,7 @@ impl ChannelViewEntry {
                 let longitude = 0.0000001 * *long as f64;
                 button(text(format!("({:.2}, {:.2}) 📌", latitude, longitude)).shaping(Advanced))
                     .padding(0)
-                    .style(|theme, status| transparent_button_style(theme, status, COLOR_GREEN))
+                    .style(|theme, status| transparent_button_style(theme, status, COLOR_BLUE))
                     .on_press(ShowLocation(latitude, longitude))
                     .into()
             }
