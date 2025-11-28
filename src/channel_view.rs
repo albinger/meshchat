@@ -1,5 +1,5 @@
 use crate::Message::DeviceViewEvent;
-use crate::channel_view::ChannelId::Channel;
+use crate::channel_view::ChannelId::{Channel, Node};
 use crate::channel_view::ChannelViewMessage::{ClearMessage, MessageInput, SendMessage};
 use crate::channel_view_entry::Payload::{
     EmojiReply, NewTextMessage, Ping, Position, TextMessageReply,
@@ -15,6 +15,8 @@ use iced::widget::scrollable::Scrollbar;
 use iced::widget::text_input::{Icon, Side};
 use iced::widget::{Column, Container, Row, Space, button, scrollable, text, text_input};
 use iced::{Center, Element, Fill, Font, Padding, Pixels, Task};
+use meshtastic::packet::PacketDestination;
+use meshtastic::types::{MeshChannel, NodeId};
 use ringmap::RingMap;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
@@ -42,6 +44,21 @@ impl Default for ChannelId {
 impl Display for ChannelId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{:?}", self)
+    }
+}
+
+impl ChannelId {
+    pub fn to_destination(&self) -> (PacketDestination, MeshChannel) {
+        match self {
+            Channel(channel_number) => (
+                PacketDestination::Broadcast,
+                MeshChannel::from(*channel_number as u32),
+            ),
+            Node(node_id) => (
+                PacketDestination::Node(NodeId::from(*node_id)),
+                MeshChannel::default(),
+            ),
+        }
     }
 }
 
@@ -169,7 +186,8 @@ impl ChannelView {
             .width(Fill)
             .height(Fill);
 
-        // A row of action buttons at the bottom of the channel view
+        // A row of action buttons at the bottom of the channel view - this could be made
+        // a menu or something different in the future
         let channel_buttons = Row::new()
             .push(
                 button(text("Send Position"))

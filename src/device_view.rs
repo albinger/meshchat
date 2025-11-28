@@ -419,14 +419,20 @@ impl DeviceView {
                     let seen = self.viewing_channel == Some(channel_id.clone());
                     let name = self.source_name(mesh_packet);
                     if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
-                        let new_message = ChannelViewEntry::new(
-                            Position(position.latitude_i.unwrap(), position.longitude_i.unwrap()),
-                            mesh_packet.from,
-                            mesh_packet.id,
-                            name,
-                            seen,
-                        );
-                        channel_view.new_message(new_message);
+                        if let Some(lat) = position.latitude_i
+                            && let Some(lon) = position.longitude_i
+                        {
+                            let new_message = ChannelViewEntry::new(
+                                Position(lat, lon),
+                                mesh_packet.from,
+                                mesh_packet.id,
+                                name,
+                                seen,
+                            );
+                            channel_view.new_message(new_message);
+                        } else {
+                            eprintln!("No lat/lon for Position: {:?}", position);
+                        }
                     } else {
                         eprintln!("No channel for ChannelId: {}", channel_id);
                     }
