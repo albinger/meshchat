@@ -31,6 +31,7 @@ use iced::{Bottom, Center, Element, Fill, Padding, Task};
 use meshtastic::Message as _;
 use meshtastic::protobufs::channel::Role;
 use meshtastic::protobufs::channel::Role::*;
+use meshtastic::protobufs::config::device_config;
 use meshtastic::protobufs::from_radio::PayloadVariant;
 use meshtastic::protobufs::mesh_packet::PayloadVariant::Decoded;
 use meshtastic::protobufs::telemetry::Variant::DeviceMetrics;
@@ -262,22 +263,17 @@ impl DeviceView {
             Some(PayloadVariant::MyInfo(my_node_info)) => {
                 self.my_node_num = Some(my_node_info.my_node_num);
             }
-            Some(PayloadVariant::NodeInfo(node_info)) => {
-                if Some(node_info.num) == self.my_node_num {
-                    self.my_position = node_info.position;
-                }
-                self.add_node(node_info)
-            }
+            Some(PayloadVariant::NodeInfo(node_info)) => self.add_node(node_info),
             // This Packet conveys information about a Channel that exists on the radio
             Some(PayloadVariant::Channel(channel)) => self.add_channel(channel),
-            Some(PayloadVariant::QueueStatus(_)) => {
-                // TODO maybe show if devices in outgoing queue?
-            }
             Some(PayloadVariant::Metadata(_)) => {
-                // TODO could be interesting to get device_hardware value "hw_model"
+                // TODO could be interesting to get device_hardware value "hw_model" and "role"
                 // see https://docs.rs/meshtastic/0.1.7/meshtastic/protobufs/enum.HardwareModel.html
             }
             Some(PayloadVariant::ClientNotification(notification)) => {
+                // A notification message from the device to the client To be used for important
+                // messages that should to be displayed to the user in the form of push
+                // notifications or validation messages when saving invalid configuration.
                 return Task::perform(empty(), move |_| {
                     Message::AppNotification(
                         "Radio Notification".to_string(),
@@ -294,10 +290,11 @@ impl DeviceView {
 
     // Add a new node to the list if it has the User info we want and is not marked to be ignored
     fn add_node(&mut self, node_info: NodeInfo) {
-        if let Some(my_node_num) = self.my_node_num
-            && my_node_num != node_info.num
-            && !node_info.is_ignored
+        if Some(node_info.num) == self.my_node_num {
+            self.my_position = node_info.position;
+        } else if !node_info.is_ignored
             && node_info.user.is_some()
+            && node_info.user.as_ref().unwrap().role() == device_config::Role::Client
         {
             let channel_id = Node(node_info.num);
             self.nodes.insert(node_info.num, node_info);
@@ -416,8 +413,7 @@ impl DeviceView {
                     }
                 }
                 Ok(PortNum::PositionApp) => {
-                    let position =
-                        meshtastic::protobufs::Position::decode(&data.payload as &[u8]).unwrap();
+                    let position = Position::decode(&data.payload as &[u8]).unwrap();
                     let channel_id = self.channel_id_from_packet(mesh_packet);
                     let seen = self.viewing_channel == Some(channel_id.clone());
                     let name = self.source_name(mesh_packet);
