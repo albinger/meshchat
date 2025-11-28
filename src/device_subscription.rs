@@ -42,7 +42,7 @@ pub enum SubscriberMessage {
     Connect(BleDevice),
     Disconnect,
     SendText(String, ChannelId),
-    SendPosition(ChannelId),
+    SendPosition(ChannelId, Position),
     SendInfo(ChannelId),
     RadioPacket(Box<FromRadio>),
 }
@@ -169,9 +169,8 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
                                 send_message(&mut api, &mut my_router, channel_id, text).await;
                                 let _none = stream_api.replace(api);
                             }
-                            SendPosition(channel_id) => {
+                            SendPosition(channel_id, position) => {
                                 let mut api = stream_api.take().unwrap();
-                                let position = my_position();
                                 send_position(&mut api, &mut my_router, channel_id, position).await;
                                 let _none = stream_api.replace(api);
                             }
@@ -197,34 +196,6 @@ pub fn subscribe() -> impl Stream<Item = SubscriptionEvent> {
             }
         }
     })
-}
-
-fn my_position() -> Position {
-    Position {
-        latitude_i: None,
-        longitude_i: None,
-        altitude: None,
-        time: 0,
-        location_source: 0,
-        altitude_source: 0,
-        timestamp: 0,
-        timestamp_millis_adjust: 0,
-        altitude_hae: None,
-        altitude_geoidal_separation: None,
-        pdop: 0,
-        hdop: 0,
-        vdop: 0,
-        gps_accuracy: 0,
-        ground_speed: None,
-        ground_track: None,
-        fix_quality: 0,
-        fix_type: 0,
-        sats_in_view: 0,
-        sensor_id: 0,
-        next_update: 0,
-        seq_number: 0,
-        precision_bits: 0,
-    }
 }
 
 // TODO handle errors

@@ -2,7 +2,7 @@ use crate::Message::DeviceViewEvent;
 use crate::channel_view::ChannelId::{Channel, Node};
 use crate::channel_view::ChannelViewMessage::{ClearMessage, MessageInput, SendMessage};
 use crate::channel_view_entry::Payload::{
-    EmojiReply, NewTextMessage, Ping, Position, TextMessageReply,
+    EmojiReply, NewTextMessage, PositionMessage, TextMessageReply, UserMessage,
 };
 use crate::device_view::DeviceViewMessage;
 use crate::device_view::DeviceViewMessage::{ChannelMsg, SendInfoMessage, SendPositionMessage};
@@ -12,6 +12,7 @@ use chrono::prelude::DateTime;
 use chrono::{Datelike, Local};
 use iced::padding::right;
 use iced::widget::scrollable::Scrollbar;
+use iced::widget::text::Shaping::Advanced;
 use iced::widget::text_input::{Icon, Side};
 use iced::widget::{Column, Container, Row, Space, button, scrollable, text, text_input};
 use iced::{Center, Element, Fill, Font, Padding, Pixels, Task};
@@ -102,7 +103,7 @@ impl ChannelView {
     /// Add a new [ChannelViewEntry] message to the [ChannelView]
     pub fn new_message(&mut self, new_message: ChannelViewEntry) {
         match &new_message.payload() {
-            NewTextMessage(_) | Position(_, _) | Ping(_) | TextMessageReply(_, _) => {
+            NewTextMessage(_) | PositionMessage(_, _) | UserMessage(_) | TextMessageReply(_, _) => {
                 // TODO manage the size of entries, with a limit (fixed or time?), and pushing
                 // the older ones to a disk store of messages
                 self.entries.insert_sorted_by(
@@ -158,7 +159,7 @@ impl ChannelView {
     }
 
     /// Construct an Element that displays the channel view
-    pub fn view(&self) -> Element<'_, Message> {
+    pub fn view(&self, enable_position: bool) -> Element<'_, Message> {
         let mut channel_view = Column::new().padding(right(10));
 
         let mut previous_day = u32::MIN;
@@ -188,14 +189,16 @@ impl ChannelView {
 
         // A row of action buttons at the bottom of the channel view - this could be made
         // a menu or something different in the future
+        let mut send_position_button =
+            button(text("Send Position 📌").shaping(Advanced)).style(button_chip_style);
+        if enable_position {
+            send_position_button = send_position_button.on_press(DeviceViewEvent(
+                SendPositionMessage(self.channel_id.clone()),
+            ));
+        }
         let channel_buttons = Row::new()
-            .push(
-                button(text("Send Position"))
-                    .style(button_chip_style)
-                    .on_press(DeviceViewEvent(SendPositionMessage(
-                        self.channel_id.clone(),
-                    ))),
-            )
+            .push(send_position_button)
+            .push(Space::with_width(6))
             .push(
                 button(text("Send Info"))
                     .style(button_chip_style)

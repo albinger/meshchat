@@ -5,7 +5,7 @@ use crate::channel_view::ChannelId::Node;
 use crate::channel_view::{ChannelId, ChannelView, ChannelViewMessage};
 use crate::channel_view_entry::ChannelViewEntry;
 use crate::channel_view_entry::Payload::{
-    EmojiReply, NewTextMessage, Ping, Position, TextMessageReply,
+    EmojiReply, NewTextMessage, PositionMessage, TextMessageReply, UserMessage,
 };
 use crate::config::Config;
 use crate::device_subscription::SubscriberMessage::{
@@ -34,7 +34,7 @@ use meshtastic::protobufs::channel::Role::*;
 use meshtastic::protobufs::from_radio::PayloadVariant;
 use meshtastic::protobufs::mesh_packet::PayloadVariant::Decoded;
 use meshtastic::protobufs::telemetry::Variant::DeviceMetrics;
-use meshtastic::protobufs::{Channel, FromRadio, MeshPacket, NodeInfo, PortNum};
+use meshtastic::protobufs::{Channel, FromRadio, MeshPacket, NodeInfo, PortNum, Position};
 use meshtastic::utils::stream::BleDevice;
 use std::collections::HashMap;
 use tokio::sync::mpsc::Sender;
@@ -45,6 +45,12 @@ pub enum ConnectionState {
     Connecting(BleDevice),
     Connected(BleDevice),
     Disconnecting(BleDevice),
+}
+
+impl Default for ConnectionState {
+    fn default() -> Self {
+        Disconnected(None, None)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -60,10 +66,12 @@ pub enum DeviceViewMessage {
     SearchInput(String),
 }
 
+#[derive(Default)]
 pub struct DeviceView {
     connection_state: ConnectionState,
     subscription_sender: Option<Sender<SubscriberMessage>>,
     my_node_num: Option<u32>,
+    my_position: Option<Position>,
     pub(crate) viewing_channel: Option<ChannelId>,
     channel_views: HashMap<ChannelId, ChannelView>,
     pub(crate) channels: Vec<Channel>,
@@ -83,8 +91,12 @@ async fn request_send(sender: Sender<SubscriberMessage>, text: String, channel_i
     let _ = sender.send(SendText(text, channel_id)).await;
 }
 
-async fn request_send_position(sender: Sender<SubscriberMessage>, channel_id: ChannelId) {
-    let _ = sender.send(SendPosition(channel_id)).await;
+async fn request_send_position(
+    sender: Sender<SubscriberMessage>,
+    channel_id: ChannelId,
+    position: Position,
+) {
+    let _ = sender.send(SendPosition(channel_id, position)).await;
 }
 
 async fn request_send_info(sender: Sender<SubscriberMessage>, channel_id: ChannelId) {
@@ -97,27 +109,7 @@ async fn request_disconnection(sender: Sender<SubscriberMessage>) {
 
 async fn empty() {}
 
-impl Default for DeviceView {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl DeviceView {
-    pub fn new() -> Self {
-        Self {
-            connection_state: Disconnected(None, None),
-            subscription_sender: None,
-            channels: vec![],
-            nodes: HashMap::new(),
-            my_node_num: None,
-            viewing_channel: None, // No channel is being shown by default
-            channel_views: HashMap::new(),
-            filter: String::default(),
-            exit_pending: false,
-        }
-    }
-
     /// Get the current [ConnectionState] of this device
     pub fn connection_state(&self) -> &ConnectionState {
         &self.connection_state
@@ -175,10 +167,15 @@ impl DeviceView {
                 })
             }
             SendPositionMessage(channel_id) => {
-                let sender = self.subscription_sender.clone();
-                Task::perform(request_send_position(sender.unwrap(), channel_id), |_| {
-                    Message::None
-                })
+                if let Some(position) = &self.my_position {
+                    let sender = self.subscription_sender.clone();
+                    Task::perform(
+                        request_send_position(sender.unwrap(), channel_id, *position),
+                        |_| Message::None,
+                    )
+                } else {
+                    Task::none()
+                }
             }
             SendInfoMessage(channel_id) => {
                 let sender = self.subscription_sender.clone();
@@ -255,6 +252,7 @@ impl DeviceView {
             }
         }
     }
+
     /// Handle [FromRadio] packets coming from the radio, forwarded from the device_subscription
     fn handle_from_radio(&mut self, packet: Box<FromRadio>) -> Task<Message> {
         match packet.payload_variant {
@@ -264,7 +262,12 @@ impl DeviceView {
             Some(PayloadVariant::MyInfo(my_node_info)) => {
                 self.my_node_num = Some(my_node_info.my_node_num);
             }
-            Some(PayloadVariant::NodeInfo(node_info)) => self.add_node(node_info),
+            Some(PayloadVariant::NodeInfo(node_info)) => {
+                if Some(node_info.num) == self.my_node_num {
+                    self.my_position = node_info.position;
+                }
+                self.add_node(node_info)
+            }
             // This Packet conveys information about a Channel that exists on the radio
             Some(PayloadVariant::Channel(channel)) => self.add_channel(channel),
             Some(PayloadVariant::QueueStatus(_)) => {
@@ -423,7 +426,7 @@ impl DeviceView {
                             && let Some(lon) = position.longitude_i
                         {
                             let new_message = ChannelViewEntry::new(
-                                Position(lat, lon),
+                                PositionMessage(lat, lon),
                                 mesh_packet.from,
                                 mesh_packet.id,
                                 name,
@@ -455,7 +458,7 @@ impl DeviceView {
                     let seen = self.viewing_channel == Some(channel_id.clone());
                     if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
                         let new_message = ChannelViewEntry::new(
-                            Ping(user.id),
+                            UserMessage(user.id),
                             mesh_packet.from,
                             mesh_packet.id,
                             name,
@@ -565,7 +568,7 @@ impl DeviceView {
         if let Some(channel_number) = &self.viewing_channel
             && let Some(channel_view) = self.channel_views.get(channel_number)
         {
-            return channel_view.view();
+            return channel_view.view(self.my_position.is_some());
         }
 
         // If not viewing a channel/user, show the list of channels and users

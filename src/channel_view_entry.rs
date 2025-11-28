@@ -2,7 +2,7 @@ use crate::Message;
 use crate::Message::{DeviceViewEvent, ShowLocation};
 use crate::channel_view::ChannelId;
 use crate::channel_view_entry::Payload::{
-    EmojiReply, NewTextMessage, Ping, Position, TextMessageReply,
+    EmojiReply, NewTextMessage, PositionMessage, TextMessageReply, UserMessage,
 };
 use crate::device_view::DeviceViewMessage::ShowChannel;
 use crate::styles::{
@@ -29,8 +29,8 @@ pub enum Payload {
     TextMessageReply(u32, String),
     /// EmojiReply(reply_to_id, emoji_code string)
     EmojiReply(u32, String),
-    Position(i32, i32),
-    Ping(String), // Could add hw_model or similar if wanted
+    PositionMessage(i32, i32),
+    UserMessage(String), // Could add hw_model or similar if wanted
 }
 
 /// An entry in the Channel View that represents some type of message sent to either this user on
@@ -239,7 +239,7 @@ impl ChannelViewEntry {
                     .shaping(Advanced)
                     .into()
             }
-            Position(lat, long) => {
+            PositionMessage(lat, long) => {
                 let latitude = 0.0000001 * *lat as f64;
                 let longitude = 0.0000001 * *long as f64;
                 button(text(format!("({:.2}, {:.2}) 📌", latitude, longitude)).shaping(Advanced))
@@ -248,7 +248,7 @@ impl ChannelViewEntry {
                     .on_press(ShowLocation(latitude, longitude))
                     .into()
             }
-            Ping(user_name) => text(format!("Ping from {}", user_name))
+            UserMessage(user_name) => text(format!("Ping from {}", user_name))
                 .style(|_| MESSAGE_TEXT_STYLE)
                 .size(18)
                 .shaping(Advanced)
