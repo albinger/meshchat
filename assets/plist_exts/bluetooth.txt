@@ -1,0 +1,2 @@
+<key>NSBluetoothAlwaysUsageDescription</key>
+<string>MeshChat finds and connects to meshtastic radios using BlueTooth.</string>
