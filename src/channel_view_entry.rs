@@ -92,6 +92,11 @@ impl ChannelViewEntry {
         }
     }
 
+    /// Return the node id that sent the message
+    pub fn from(&self) -> u32 {
+        self.from
+    }
+
     /// Get a reference to the payload of this message
     pub fn payload(&self) -> &Payload {
         &self.payload
@@ -342,9 +347,7 @@ impl ChannelViewEntry {
                     (menu_button("copy".into(), Message::None))
                     (menu_button("react".into(), Message::None))
                     (menu_button("reply".into(), Message::None))
-                    (menu_button(dm, DeviceViewEvent(ShowChannel(Some(ChannelId::Node(
-                        self.from(),
-                    ))))))
+                    (menu_button(dm, DeviceViewEvent(ShowChannel(Some(ChannelId::Node(self.from()))))))
                 )).width(100)
             })
         ).style(menu_button_style);
