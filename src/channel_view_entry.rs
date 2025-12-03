@@ -1,8 +1,10 @@
 use crate::Message;
-use crate::Message::ShowLocation;
+use crate::Message::{DeviceViewEvent, ShowLocation};
+use crate::channel_view::ChannelId;
 use crate::channel_view_entry::Payload::{
     EmojiReply, NewTextMessage, PositionMessage, TextMessageReply, UserMessage,
 };
+use crate::device_view::DeviceViewMessage::ShowChannel;
 use crate::styles::{
     COLOR_BLUE, COLOR_DICTIONARY, COLOR_GREEN, MESSAGE_TEXT_STYLE, MY_MESSAGE_BUBBLE_STYLE,
     OTHERS_MESSAGE_BUBBLE_STYLE, TIME_TEXT_COLOR, TIME_TEXT_SIZE, TIME_TEXT_WIDTH,
@@ -340,7 +342,9 @@ impl ChannelViewEntry {
                     (menu_button("copy".into(), Message::None))
                     (menu_button("react".into(), Message::None))
                     (menu_button("reply".into(), Message::None))
-                    (menu_button(dm, Message::None))
+                    (menu_button(dm, DeviceViewEvent(ShowChannel(Some(ChannelId::Node(
+                        self.from(),
+                    ))))))
                 )).width(100)
             })
         ).style(menu_button_style);
