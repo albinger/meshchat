@@ -8,15 +8,18 @@ use crate::channel_view_entry::Payload::{
 };
 use crate::device_view::DeviceViewMessage;
 use crate::device_view::DeviceViewMessage::{ChannelMsg, SendInfoMessage, SendPositionMessage};
-use crate::styles::{DAY_SEPARATOR_STYLE, button_chip_style, text_input_style};
+use crate::styles::{DAY_SEPARATOR_STYLE, button_chip_style, reply_to_style, text_input_style};
 use crate::{Message, channel_view_entry::ChannelViewEntry, icons};
 use chrono::prelude::DateTime;
 use chrono::{Datelike, Local};
+use iced::font::Style::Italic;
 use iced::padding::right;
 use iced::widget::scrollable::Scrollbar;
 use iced::widget::text::Shaping::Advanced;
 use iced::widget::text_input::{Icon, Side};
-use iced::widget::{Column, Container, Row, Space, button, scrollable, text, text_input};
+use iced::widget::{
+    Column, Container, Row, Space, button, container, scrollable, text, text_input,
+};
 use iced::{Center, Element, Fill, Font, Padding, Pixels, Task};
 use meshtastic::packet::PacketDestination;
 use meshtastic::types::{MeshChannel, NodeId};
@@ -230,7 +233,13 @@ impl ChannelView {
                 PositionMessage(lat, lon) => format!("({:.2}, {:.2}) 📌", lat, lon),
                 UserMessage(original_text) => original_text.clone(),
             };
-            column = column.push(Row::new().push(text(format!("Replying to: {}", original_text))));
+            column = column.push(
+                container(text(format!("Replying to: {}", original_text)).font(Font {
+                    style: Italic,
+                    ..Default::default()
+                }))
+                .style(reply_to_style),
+            );
         }
 
         // Add the input box at the bottom of the channel view

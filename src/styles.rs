@@ -240,7 +240,7 @@ pub fn transparent_button_style(_theme: &Theme, status: Status, color: Color) ->
     style
 }
 
-pub fn fav_button_style(_theme: &Theme, status: button::Status) -> button::Style {
+pub fn fav_button_style(_theme: &Theme, status: Status) -> button::Style {
     match status {
         Status::Active => button::Style {
             background: Some(Background::Color(Color::TRANSPARENT)),
@@ -248,7 +248,7 @@ pub fn fav_button_style(_theme: &Theme, status: button::Status) -> button::Style
             border: NO_BORDER,
             shadow: NO_SHADOW,
         },
-        Status::Hovered => button::Style {
+        Hovered => button::Style {
             background: Some(Background::Color(CYAN)),
             text_color: Color::WHITE,
             border: BUTTON_BORDER_ACTIVE,
@@ -269,7 +269,7 @@ pub fn fav_button_style(_theme: &Theme, status: button::Status) -> button::Style
     }
 }
 
-pub fn button_chip_style(_theme: &Theme, status: button::Status) -> button::Style {
+pub fn button_chip_style(_theme: &Theme, status: Status) -> button::Style {
     match status {
         Status::Active => button::Style {
             background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.8, 1.0))),
@@ -277,7 +277,7 @@ pub fn button_chip_style(_theme: &Theme, status: button::Status) -> button::Styl
             border: BUTTON_BORDER_ACTIVE,
             shadow: NO_SHADOW,
         },
-        Status::Hovered => button::Style {
+        Hovered => button::Style {
             background: Some(Background::Color(CYAN)),
             text_color: Color::WHITE,
             border: BUTTON_BORDER_ACTIVE,
@@ -362,6 +362,17 @@ pub fn name_box_style(_theme: &Theme) -> Style {
     NAME_BOX_STYLE
 }
 
+const REPLY_TO_STYLE: Style = Style {
+    text_color: Some(Color::WHITE),
+    background: Some(Background::Color(Color::from_rgba(0.08, 0.3, 0.22, 1.0))),
+    border: MESSAGE_BORDER,
+    shadow: NO_SHADOW,
+};
+
+pub fn reply_to_style(_theme: &Theme) -> Style {
+    REPLY_TO_STYLE
+}
+
 pub const VIEW_BUTTON_HOVER_STYLE: button::Style = button::Style {
     background: Some(Background::Color(Color::from_rgba(0.0, 0.8, 0.8, 1.0))),
     text_color: Color::BLACK,
@@ -376,7 +387,7 @@ pub const VIEW_BUTTON_STYLE: button::Style = button::Style {
     shadow: NO_SHADOW,
 };
 
-pub fn channel_row_style(_: &Theme, status: Status) -> iced::widget::button::Style {
+pub fn channel_row_style(_: &Theme, status: Status) -> button::Style {
     if status == Hovered {
         VIEW_BUTTON_HOVER_STYLE
     } else {
@@ -384,7 +395,7 @@ pub fn channel_row_style(_: &Theme, status: Status) -> iced::widget::button::Sty
     }
 }
 
-pub fn menu_button_style(_theme: &iced::Theme, _status: iced_aw::style::Status) -> menu::Style {
+pub fn menu_button_style(_theme: &Theme, _status: iced_aw::style::Status) -> menu::Style {
     menu::Style {
         bar_background: Background::Color(Color::TRANSPARENT),
         bar_border: NO_BORDER,
