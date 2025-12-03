@@ -1,10 +1,10 @@
 use crate::Message;
 use crate::Message::{DeviceViewEvent, ShowLocation};
-use crate::channel_view::ChannelId;
+use crate::channel_view::{ChannelId, ChannelViewMessage};
 use crate::channel_view_entry::Payload::{
     EmojiReply, NewTextMessage, PositionMessage, TextMessageReply, UserMessage,
 };
-use crate::device_view::DeviceViewMessage::ShowChannel;
+use crate::device_view::DeviceViewMessage::{ChannelMsg, ShowChannel};
 use crate::styles::{
     COLOR_BLUE, COLOR_DICTIONARY, COLOR_GREEN, MESSAGE_TEXT_STYLE, MY_MESSAGE_BUBBLE_STYLE,
     OTHERS_MESSAGE_BUBBLE_STYLE, TIME_TEXT_COLOR, TIME_TEXT_SIZE, TIME_TEXT_WIDTH,
@@ -335,24 +335,24 @@ impl ChannelViewEntry {
         message_column.into()
     }
 
+    // TODO differentiate if we are in a node or channel view
+    // if a node view, don't show the DM menu item
     fn menu_bar<'a>(&self) -> MenuBar<'a, Message, Theme, Renderer> {
         let menu_tpl_1 = |items| Menu::new(items).max_width(180.0).spacing(2);
 
         let dm = format!("DM with {}", self.name.as_ref().unwrap_or(&"".to_string()));
         #[rustfmt::skip]
-        let mb = menu_bar!(
-            (menu_root_button("▼"), {
-                menu_tpl_1(menu_items!(
-                    (menu_button("forward".into(), Message::None))
-                    (menu_button("copy".into(), Message::None))
-                    (menu_button("react".into(), Message::None))
-                    (menu_button("reply".into(), Message::None))
-                    (menu_button(dm, DeviceViewEvent(ShowChannel(Some(ChannelId::Node(self.from()))))))
-                )).width(100)
-            })
-        ).style(menu_button_style);
-
-        mb
+        let menu_items = menu_items!(
+            //(menu_button("forward".into(), Message::None))
+            //(menu_button("copy".into(), Message::None))
+            (menu_button("reply".into(), DeviceViewEvent(ChannelMsg(ChannelViewMessage::PrepareReply(self.message_id)))))
+            //(menu_button("react".into(), Message::None))
+            (menu_button(dm, DeviceViewEvent(ShowChannel(Some(ChannelId::Node(self.from()))))))
+        );
+        menu_bar!((menu_root_button("▼"), {
+            menu_tpl_1(menu_items).width(100)
+        }))
+        .style(menu_button_style)
     }
 }
 

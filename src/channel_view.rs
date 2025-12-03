@@ -1,6 +1,8 @@
 use crate::Message::DeviceViewEvent;
 use crate::channel_view::ChannelId::{Channel, Node};
-use crate::channel_view::ChannelViewMessage::{ClearMessage, MessageInput, SendMessage};
+use crate::channel_view::ChannelViewMessage::{
+    ClearMessage, MessageInput, PrepareReply, SendMessage,
+};
 use crate::channel_view_entry::Payload::{
     EmojiReply, NewTextMessage, PositionMessage, TextMessageReply, UserMessage,
 };
@@ -28,6 +30,7 @@ pub enum ChannelViewMessage {
     MessageInput(String),
     ClearMessage,
     SendMessage,
+    PrepareReply(u32), // entry_id
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
@@ -70,6 +73,7 @@ pub struct ChannelView {
     message: String,                         // text message typed in so far
     entries: RingMap<u32, ChannelViewEntry>, // entries received so far, keyed by message_id, ordered by rx_time
     my_source: u32,
+    preparing_reply: Option<u32>,
 }
 
 async fn empty() {}
@@ -83,6 +87,7 @@ impl ChannelView {
             message: String::new(),
             entries: RingMap::new(),
             my_source: source,
+            preparing_reply: None,
         }
     }
 
@@ -145,6 +150,7 @@ impl ChannelView {
                     let msg = self.message.clone();
                     self.message = String::new();
                     let channel_id = self.channel_id.clone();
+                    self.preparing_reply = None;
                     Task::perform(empty(), move |_| {
                         DeviceViewEvent(DeviceViewMessage::SendTextMessage(
                             msg.clone(),
@@ -154,6 +160,10 @@ impl ChannelView {
                 } else {
                     Task::none()
                 }
+            }
+            PrepareReply(entry_id) => {
+                self.preparing_reply = Some(entry_id);
+                Task::none()
             }
         }
     }
@@ -206,12 +216,25 @@ impl ChannelView {
             );
 
         // Place the scrollable in a column, with an input box at the bottom
-        Column::new()
+        let mut column = Column::new()
             .padding(4)
             .push(channel_scroll)
-            .push(channel_buttons)
-            .push(self.input_box())
-            .into()
+            .push(channel_buttons);
+
+        // If we are replying to a message, add a row at the bottom of the channel view with the original text
+        if let Some(entry_id) = &self.preparing_reply {
+            let original_text = match self.entries.get(entry_id).unwrap().payload() {
+                NewTextMessage(original_text) => original_text.clone(),
+                TextMessageReply(_, original_text) => original_text.clone(),
+                EmojiReply(_, original_text) => original_text.clone(),
+                PositionMessage(lat, lon) => format!("({:.2}, {:.2}) 📌", lat, lon),
+                UserMessage(original_text) => original_text.clone(),
+            };
+            column = column.push(Row::new().push(text(format!("Replying to: {}", original_text))));
+        }
+
+        // Add the input box at the bottom of the channel view
+        column.push(self.input_box()).into()
     }
 
     /// Return an Element that displays a day separator
