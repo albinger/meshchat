@@ -269,6 +269,7 @@ impl DeviceView {
             Some(PayloadVariant::MyInfo(my_node_info)) => {
                 self.my_node_num = Some(my_node_info.my_node_num);
             }
+            // Information about a Node that exists on the radio - which could be myself
             Some(PayloadVariant::NodeInfo(node_info)) => self.add_node(node_info),
             // This Packet conveys information about a Channel that exists on the radio
             Some(PayloadVariant::Channel(channel)) => self.add_channel(channel),
@@ -366,7 +367,7 @@ impl DeviceView {
                 Ok(PortNum::AlertApp) => {
                     // TODO something special for an Alert message!
                     let channel_id = self.channel_id_from_packet(mesh_packet);
-                    let name = self.source_name(mesh_packet);
+                    let name = self.short_name(mesh_packet);
                     if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
                         let seen = self.viewing_channel == Some(channel_id.clone());
                         let new_message = ChannelViewEntry::new(
@@ -384,7 +385,7 @@ impl DeviceView {
                 }
                 Ok(PortNum::TextMessageApp) => {
                     let channel_id = self.channel_id_from_packet(mesh_packet);
-                    let name = self.source_name(mesh_packet);
+                    let name = self.short_name(mesh_packet);
                     if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
                         let message = if data.reply_id == 0 {
                             NewTextMessage(String::from_utf8(data.payload.clone()).unwrap())
@@ -422,7 +423,7 @@ impl DeviceView {
                     let position = Position::decode(&data.payload as &[u8]).unwrap();
                     let channel_id = self.channel_id_from_packet(mesh_packet);
                     let seen = self.viewing_channel == Some(channel_id.clone());
-                    let name = self.source_name(mesh_packet);
+                    let name = self.short_name(mesh_packet);
                     self.update_node_position(mesh_packet.from, &position);
                     if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
                         if let Some(lat) = position.latitude_i
@@ -457,7 +458,7 @@ impl DeviceView {
                     let user = meshtastic::protobufs::User::decode(&data.payload as &[u8]).unwrap();
                     // TODO could get hw_model here also for the device
                     let channel_id = self.channel_id_from_packet(mesh_packet);
-                    let name = self.source_name(mesh_packet);
+                    let name = self.short_name(mesh_packet);
                     let seen = self.viewing_channel == Some(channel_id.clone());
                     if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
                         let new_message = ChannelViewEntry::new(
@@ -481,7 +482,7 @@ impl DeviceView {
 
     /// Return an Optional name to display in the message box as the source of a message.
     /// If the message is from myself, then return None.
-    fn source_name(&self, mesh_packet: &MeshPacket) -> Option<String> {
+    fn short_name(&self, mesh_packet: &MeshPacket) -> Option<String> {
         if Some(mesh_packet.from) == self.my_node_num {
             return None;
         }
@@ -543,22 +544,21 @@ impl DeviceView {
             }
         };
 
-        // possibly add a channel name button next
+        // possibly add a node/channel name button next
         match &self.viewing_channel {
             Some(ChannelId::Channel(channel_index)) => {
                 let index = *channel_index as usize;
                 if let Some(channel) = self.channels.get(index) {
-                    // TODO do this in channel_view code like in view() below.
                     let channel_name = Self::channel_name(channel);
                     header = header
                         .push(button(text(channel_name).shaping(Advanced)).style(button_chip_style))
                 }
             }
             Some(Node(node_id)) => {
-                header = header.push(
-                    button(text(self.node_name(*node_id).unwrap()).shaping(Advanced))
-                        .style(button_chip_style),
-                )
+                if let Some(node_name) = self.node_name(*node_id) {
+                    header = header
+                        .push(button(text(node_name).shaping(Advanced)).style(button_chip_style))
+                }
             }
             None => {}
         }
