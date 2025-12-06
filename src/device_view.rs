@@ -131,7 +131,7 @@ impl DeviceView {
             ConnectRequest(device, channel_id) => {
                 // save the desired channel to show for when the connection is completed later
                 self.viewing_channel = channel_id;
-                self.connection_state = Connecting(device.clone()); // TODO make state change depend on message back from subscription
+                self.connection_state = Connecting(device.clone());
                 let sender = self.subscription_sender.clone();
                 Task::perform(request_connection(sender.unwrap(), device.clone()), |_| {
                     Navigation(View::Device)
@@ -139,7 +139,7 @@ impl DeviceView {
             }
             DisconnectRequest(name, exit) => {
                 self.exit_pending = exit;
-                self.connection_state = Disconnecting(name); // TODO make state change depend on message back from subscription
+                self.connection_state = Disconnecting(name);
                 // Send a message to the subscription to disconnect
                 let sender = self.subscription_sender.clone();
                 Task::perform(request_disconnection(sender.unwrap()), |_| {
@@ -271,10 +271,6 @@ impl DeviceView {
             Some(PayloadVariant::NodeInfo(node_info)) => self.add_node(node_info),
             // This Packet conveys information about a Channel that exists on the radio
             Some(PayloadVariant::Channel(channel)) => self.add_channel(channel),
-            Some(PayloadVariant::Metadata(_)) => {
-                // TODO could be interesting to get device_hardware value "hw_model" and "role"
-                // see https://docs.rs/meshtastic/0.1.7/meshtastic/protobufs/enum.HardwareModel.html
-            }
             Some(PayloadVariant::ClientNotification(notification)) => {
                 // A notification message from the device to the client To be used for important
                 // messages that should to be displayed to the user in the form of push
@@ -364,7 +360,6 @@ impl DeviceView {
                     }
                 }
                 Ok(PortNum::AlertApp) => {
-                    // TODO something special for an Alert message!
                     let channel_id = self.channel_id_from_packet(mesh_packet);
                     let name = self.short_name(mesh_packet);
                     if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
@@ -455,7 +450,6 @@ impl DeviceView {
                 Ok(PortNum::NeighborinfoApp) => println!("Neighbor Info payload"),
                 Ok(PortNum::NodeinfoApp) => {
                     let user = meshtastic::protobufs::User::decode(&data.payload as &[u8]).unwrap();
-                    // TODO could get hw_model here also for the device
                     let channel_id = self.channel_id_from_packet(mesh_packet);
                     let name = self.short_name(mesh_packet);
                     let seen = self.viewing_channel == Some(channel_id.clone());

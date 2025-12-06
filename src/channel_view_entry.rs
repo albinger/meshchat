@@ -224,9 +224,6 @@ impl ChannelViewEntry {
                 .shaping(Advanced)
                 .into(),
             TextMessageReply(reply_to_id, text_msg) => {
-                // TODO 1) Cap the length of the quoted text
-                // TODO 2) Navigate to the original full message if the summary is clicked on
-                // Add a row to the message we are replying to if there is one
                 if let Some(original_text) = Self::text_from_id(entries, *reply_to_id) {
                     let quote_row = Row::new()
                         .push(text("Re: ").color(COLOR_GREEN).shaping(Advanced))

@@ -112,8 +112,6 @@ impl ChannelView {
     pub fn new_message(&mut self, new_message: ChannelViewEntry) {
         match &new_message.payload() {
             NewTextMessage(_) | PositionMessage(_, _) | UserMessage(_) | TextMessageReply(_, _) => {
-                // TODO manage the size of entries, with a limit (fixed or time?), and pushing
-                // the older ones to a disk store of messages
                 self.entries.insert_sorted_by(
                     new_message.message_id(),
                     new_message,

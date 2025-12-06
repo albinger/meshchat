@@ -16,15 +16,20 @@ use meshtastic::protobufs::config::device_config::Role;
 use meshtastic::protobufs::from_radio::PayloadVariant::{
     Channel, ClientNotification, MyInfo, NodeInfo, Packet,
 };
-use meshtastic::protobufs::{mesh_packet, Data, FromRadio, MeshPacket, PortNum, Position, User};
+use meshtastic::protobufs::{Data, FromRadio, MeshPacket, PortNum, Position, User, mesh_packet};
 use meshtastic::types::NodeId;
 use meshtastic::utils::stream::BleDevice;
-use meshtastic::{utils, Message};
+use meshtastic::{Message, utils};
 use std::pin::Pin;
 use std::time::Duration;
-use tokio::sync::mpsc::{channel, Sender};
+use tokio::sync::mpsc::{Sender, channel};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_stream::{Stream, StreamExt};
+
+// TODO it looks like message id is not being set correctly, as a new message overwrites previous
+// ones in the channel view
+// I think due to change in method used to send message
+// review the crate code to see how it calls the Router, where it gets message ID from
 
 #[derive(Debug, Clone)]
 pub enum SubscriptionEvent {
