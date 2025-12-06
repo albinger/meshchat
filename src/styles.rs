@@ -395,6 +395,32 @@ pub fn channel_row_style(_: &Theme, status: Status) -> button::Style {
     }
 }
 
+pub fn error_notification_style(_theme: &Theme) -> Style {
+    Style {
+        text_color: Some(Color::WHITE),
+        background: Some(Background::Color(COLOR_RED)),
+        border: Border {
+            radius: Radius::from(12.0), // rounded corners
+            width: 2.0,
+            color: COLOR_YELLOW,
+        },
+        ..Default::default()
+    }
+}
+
+pub fn info_notification_style(_theme: &Theme) -> Style {
+    Style {
+        text_color: Some(Color::WHITE),
+        background: Some(Background::Color(Color::from_rgb8(0x00, 0x00, 0x00))), // black
+        border: Border {
+            radius: Radius::from(12.0), // rounded corners
+            width: 2.0,
+            color: Color::WHITE,
+        },
+        ..Default::default()
+    }
+}
+
 pub fn menu_button_style(_theme: &Theme, _status: iced_aw::style::Status) -> menu::Style {
     menu::Style {
         bar_background: Background::Color(Color::TRANSPARENT),
