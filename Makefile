@@ -1,8 +1,8 @@
-all: clippy updeps debug
+all: clippy udeps debug
 
 pr: checks tests
 
-checks: format clippy publish udeps
+checks: format clippy publish udeps todos
 
 tests: debug release publish test
 
@@ -20,6 +20,9 @@ test:
 
 udeps:
 	cargo +nightly udeps
+
+todos:
+	find . -name "*.rs" -exec grep "TODO" {} \; -print
 
 debug:
 	cargo build
