@@ -235,7 +235,11 @@ impl ChannelView {
                 TextMessageReply(_, original_text) => original_text.clone(),
                 EmojiReply(_, original_text) => original_text.clone(),
                 PositionMessage(lat, lon) => format!("📌 ({:.2}, {:.2})", lat, lon),
-                UserMessage(user) => user.short_name.clone(),
+                UserMessage(user) => format!(
+                    "Reply to ⓘ message from {} ({})",
+                    user.long_name.clone(),
+                    user.short_name.clone()
+                ),
             };
             column = column.push(
                 container(text(format!("Replying to: {}", original_text)).font(Font {
