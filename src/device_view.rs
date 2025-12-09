@@ -119,12 +119,6 @@ impl DeviceView {
         &self.connection_state
     }
 
-    fn report_error(summary: String, detail: String) -> Task<Message> {
-        Task::perform(empty(), move |_| {
-            Message::AppError(summary.clone(), detail.clone())
-        })
-    }
-
     /// Return a true value to show we can show the device view, false for main to decide
     pub fn update(&mut self, device_view_message: DeviceViewMessage) -> Task<Message> {
         match device_view_message {
@@ -248,7 +242,9 @@ impl DeviceView {
             ConnectionError(id, summary, detail) => {
                 self.connection_state = Disconnected(Some(id), Some(summary.clone()));
                 Task::perform(empty(), |_| Navigation(DeviceList))
-                    .chain(Self::report_error(summary.clone(), detail.clone()))
+                    .chain(Task::perform(empty(), move |_| {
+                        Message::AppError(summary.clone(), detail.clone())
+                    }))
             }
         }
     }
