@@ -27,45 +27,36 @@ impl Notifications {
 
         for (id, notification) in &self.inner {
             notifications = notifications.push(match notification {
-                Notification::Error(summary, details) => Self::notification_box(
-                    *id,
-                    summary.clone(),
-                    details.clone(),
-                    error_notification_style,
-                ),
-                Notification::Info(summary, details) => Self::notification_box(
-                    *id,
-                    summary.clone(),
-                    details.clone(),
-                    info_notification_style,
-                ),
+                Notification::Error(summary, details) => {
+                    Self::notification_box(*id, summary, details, error_notification_style)
+                }
+                Notification::Info(summary, details) => {
+                    Self::notification_box(*id, summary, details, info_notification_style)
+                }
             });
         }
 
         notifications.into()
     }
 
-    fn notification_box(
+    fn notification_box<'a>(
         id: usize,
-        summary: String,
-        detail: String,
+        summary: &'a str,
+        detail: &'a str,
         style: impl Fn(&Theme) -> Style + 'static,
-    ) -> Element<'static, Message> {
-        let row = Row::new()
-            .width(iced::Length::Fill)
-            .push(text(summary).size(20))
-            .push(
-                Column::new().width(Fill).align_x(Right).push(
-                    button("OK")
-                        .style(button_chip_style)
-                        .on_press(RemoveNotification(id)),
-                ),
-            );
+    ) -> Element<'a, Message> {
+        let row = Row::new().width(Fill).push(text(summary).size(20)).push(
+            Column::new().width(Fill).align_x(Right).push(
+                button("OK")
+                    .style(button_chip_style)
+                    .on_press(RemoveNotification(id)),
+            ),
+        );
 
         Container::new(Column::new().push(row).push(text(detail).size(14)))
             .padding([6, 12])
             .style(style)
-            .width(iced::Length::Fill)
+            .width(Fill)
             .into()
     }
 
