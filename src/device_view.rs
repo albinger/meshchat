@@ -75,6 +75,7 @@ pub struct DeviceView {
     my_position: Option<Position>,
     my_info: bool,
     pub(crate) viewing_channel: Option<ChannelId>,
+    /// Map of ChannelViews, indexed by ChannelId
     channel_views: HashMap<ChannelId, ChannelView>,
     pub(crate) channels: Vec<Channel>,
     nodes: HashMap<u32, NodeInfo>, // all nodes known to the connected radio
@@ -355,7 +356,7 @@ impl DeviceView {
                     let channel_id = self.channel_id_from_packet(mesh_packet);
                     let name = self.short_name(mesh_packet);
                     if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
-                        let seen = self.viewing_channel == Some(channel_id.clone());
+                        let seen = self.viewing_channel == Some(channel_id);
                         let new_message = ChannelViewEntry::new(
                             NewTextMessage(String::from_utf8(data.payload.clone()).unwrap()),
                             mesh_packet.from,
@@ -391,7 +392,7 @@ impl DeviceView {
                             }
                         };
 
-                        let seen = self.viewing_channel == Some(channel_id.clone());
+                        let seen = self.viewing_channel == Some(channel_id);
                         let new_message = ChannelViewEntry::new(
                             message,
                             mesh_packet.from,
@@ -408,7 +409,7 @@ impl DeviceView {
                 Ok(PortNum::PositionApp) => {
                     let position = Position::decode(&data.payload as &[u8]).unwrap();
                     let channel_id = self.channel_id_from_packet(mesh_packet);
-                    let seen = self.viewing_channel == Some(channel_id.clone());
+                    let seen = self.viewing_channel.as_ref() == Some(&channel_id);
                     let name = self.short_name(mesh_packet);
                     self.update_node_position(mesh_packet.from, &position);
                     if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
@@ -444,7 +445,7 @@ impl DeviceView {
                     let user = meshtastic::protobufs::User::decode(&data.payload as &[u8]).unwrap();
                     let channel_id = self.channel_id_from_packet(mesh_packet);
                     let name = self.short_name(mesh_packet);
-                    let seen = self.viewing_channel == Some(channel_id.clone());
+                    let seen = self.viewing_channel.as_ref() == Some(&channel_id);
                     if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
                         let new_message = ChannelViewEntry::new(
                             UserMessage(user),
