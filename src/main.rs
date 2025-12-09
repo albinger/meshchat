@@ -84,13 +84,6 @@ fn main() -> iced::Result {
         .run_with(MeshChat::new)
 }
 
-pub fn device_name(device: &BleDevice) -> String {
-    device
-        .name
-        .clone()
-        .unwrap_or_else(|| device.mac_address.to_string())
-}
-
 impl MeshChat {
     fn new() -> (Self, Task<Message>) {
         (Self::default(), Task::batch(vec![load_config()]))
@@ -146,7 +139,7 @@ impl MeshChat {
                     }
                 }
                 // and save it asynchronously, so that we don't block the GUI thread
-                save_config(self.config.clone())
+                save_config(&self.config)
             }
             RemoveNotification(id) => {
                 self.notifications.remove(id);
@@ -163,7 +156,7 @@ impl MeshChat {
                     let _ = self.config.fav_nodes.insert(node_id);
                 }
                 // and save the config asynchronously, so that we don't block the GUI thread
-                save_config(self.config.clone())
+                save_config(&self.config)
             }
         }
     }
@@ -221,7 +214,7 @@ impl MeshChat {
     /// Handle window events, like close button or minimize button
     fn window_handler(&mut self, event: Event) -> Task<Message> {
         if let Event::Window(window::Event::CloseRequested) = event {
-            if let Connected(device) = self.device_view.connection_state().clone() {
+            if let Connected(device) = self.device_view.connection_state() {
                 self.device_view
                     .update(DisconnectRequest(device.clone(), true))
             } else {

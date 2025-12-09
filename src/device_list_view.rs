@@ -4,7 +4,7 @@ use crate::device_view::ConnectionState;
 use crate::device_view::ConnectionState::{Connected, Connecting, Disconnected, Disconnecting};
 use crate::device_view::DeviceViewMessage::{ConnectRequest, DisconnectRequest};
 use crate::styles::button_chip_style;
-use crate::{Message, View, device_name};
+use crate::{Message, View};
 use iced::futures::{SinkExt, Stream};
 use iced::widget::scrollable::Scrollbar;
 use iced::widget::{Column, Container, Row, Space, button, container, scrollable, text};
@@ -94,7 +94,7 @@ impl DeviceListView {
         header.into()
     }
 
-    pub fn view(&self, connection_state: &ConnectionState) -> Element<'static, Message> {
+    pub fn view(&self, connection_state: &ConnectionState) -> Element<'_, Message> {
         if self.discovered_devices.is_empty() {
             return empty_view();
         }
@@ -103,7 +103,7 @@ impl DeviceListView {
 
         for device in &self.discovered_devices {
             let mut device_row = Row::new().align_y(alignment::Vertical::Center).padding(2);
-            device_row = device_row.push(text(device_name(device)));
+            device_row = device_row.push(text(device.name.as_ref().unwrap()));
             device_row = device_row.push(Space::new(6, 0));
             match &connection_state {
                 Connected(connected_device) => {

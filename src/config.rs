@@ -41,11 +41,11 @@ async fn create(config_path: PathBuf) -> io::Result<()> {
 }
 
 /// Use `save_config` to save the config to disk from the UI
-pub fn save_config(config: Config) -> Task<Message> {
+pub fn save_config(config: &Config) -> Task<Message> {
     if let Some(proj_dirs) = ProjectDirs::from("net", "Mackenzie Serres", "meshchat") {
         let config_path = proj_dirs.config_dir().join("config.toml");
 
-        Task::perform(save(config_path, config), {
+        Task::perform(save(config_path, config.clone()), {
             |result| match result {
                 Ok(_) => Message::None,
                 Err(e) => Message::AppError("Error saving config file".to_string(), e.to_string()),
