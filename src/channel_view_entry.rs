@@ -317,6 +317,13 @@ impl ChannelViewEntry {
         };
 
         // Add the emoji row outside the bubble, below it
+        message_column = self.emoji_row(message_column);
+
+        message_column.into()
+    }
+
+    /// Append an element to the column that contains the emoji replies for this message, if any.
+    fn emoji_row<'a>(&self, mut message_column: Column<'a, Message>) -> Column<'a, Message> {
         if !self.emojis().is_empty() {
             let mut emoji_row = Row::new().padding(Padding {
                 top: -4.0,
@@ -335,10 +342,11 @@ impl ChannelViewEntry {
                     .padding(0),
                 );
             }
+
             message_column = message_column.push(emoji_row);
         }
 
-        message_column.into()
+        message_column
     }
 
     // TODO differentiate if we are in a node or channel view
