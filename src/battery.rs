@@ -1,4 +1,4 @@
-//! A custom battery widget for Iced that displays battery charge level or charging status.
+//! A custom battery widget for Iced that displays the battery charge level or charging status.
 //!
 //! # Example
 //!
@@ -14,10 +14,15 @@
 //! let battery_charging = Battery::new()
 //!     .state(BatteryState::Charging);
 //!
+//! // Create a battery widget showing unknown state
+//! let battery_unknown = Battery::new()
+//!     .state(BatteryState::Unknown);
+//!
 //! // Use in a column
 //! Column::new()
 //!     .push(battery_75)
-//!     .push(battery_charging);
+//!     .push(battery_charging)
+//!     .push(battery_unknown);
 //! ```
 
 use iced::advanced::layout;
@@ -35,6 +40,8 @@ pub enum BatteryState {
     Charging,
     /// Battery is charged/discharging with the given percentage (0-100)
     Charged(u32),
+    /// Battery state is unknown (show question mark)
+    Unknown,
 }
 
 impl Default for BatteryState {
@@ -43,7 +50,7 @@ impl Default for BatteryState {
     }
 }
 
-/// A battery widget that displays charge level or charging status.
+/// A battery widget that displays the charge level or charging status.
 #[allow(missing_debug_implementations)]
 pub struct Battery<Theme>
 where
@@ -114,14 +121,6 @@ where
     Theme: StyleSheet,
     Renderer: advanced::Renderer,
 {
-    fn tag(&self) -> tree::Tag {
-        tree::Tag::of::<()>()
-    }
-
-    fn state(&self) -> tree::State {
-        tree::State::new(())
-    }
-
     fn size(&self) -> Size<Length> {
         Size {
             width: self.width,
@@ -136,20 +135,6 @@ where
         limits: &layout::Limits,
     ) -> layout::Node {
         layout::atomic(limits, self.width, self.height)
-    }
-
-    fn on_event(
-        &mut self,
-        _tree: &mut Tree,
-        _event: iced::Event,
-        _layout: Layout<'_>,
-        _cursor: mouse::Cursor,
-        _renderer: &Renderer,
-        _clipboard: &mut dyn Clipboard,
-        _shell: &mut Shell<'_, Message>,
-        _viewport: &Rectangle,
-    ) -> iced::event::Status {
-        iced::event::Status::Ignored
     }
 
     fn draw(
@@ -301,14 +286,127 @@ where
                     );
                 }
             }
+            BatteryState::Unknown => {
+                // Draw a question mark using geometric shapes
+                let icon_size = bounds.height * 0.7;
+                let icon_x = bounds.x + (battery_body.width - icon_size) / 2.0;
+                let icon_y = bounds.y + (bounds.height - icon_size) / 2.0;
+                let stroke_width = icon_size * 0.15;
+
+                // Top curved part of the question mark (hook shape)
+                // Left vertical part
+                let top_left = Rectangle {
+                    x: icon_x + icon_size * 0.3,
+                    y: icon_y,
+                    width: stroke_width,
+                    height: icon_size * 0.4,
+                };
+
+                // Top horizontal part
+                let top_horizontal = Rectangle {
+                    x: icon_x + icon_size * 0.3,
+                    y: icon_y,
+                    width: icon_size * 0.4,
+                    height: stroke_width,
+                };
+
+                // Right vertical part (curved section)
+                let top_right = Rectangle {
+                    x: icon_x + icon_size * 0.6,
+                    y: icon_y + icon_size * 0.15,
+                    width: stroke_width,
+                    height: icon_size * 0.25,
+                };
+
+                // Middle vertical line
+                let middle = Rectangle {
+                    x: icon_x + icon_size * 0.45,
+                    y: icon_y + icon_size * 0.4,
+                    width: stroke_width,
+                    height: icon_size * 0.25,
+                };
+
+                // Bottom dot
+                let dot = Rectangle {
+                    x: icon_x + icon_size * 0.4,
+                    y: icon_y + icon_size * 0.7,
+                    width: icon_size * 0.2,
+                    height: icon_size * 0.2,
+                };
+
+                // Draw all parts of the question mark
+                let question_color = custom_style.unknown_color;
+                renderer.fill_quad(
+                    renderer::Quad {
+                        bounds: top_left,
+                        ..renderer::Quad::default()
+                    },
+                    Background::Color(question_color),
+                );
+                renderer.fill_quad(
+                    renderer::Quad {
+                        bounds: top_horizontal,
+                        ..renderer::Quad::default()
+                    },
+                    Background::Color(question_color),
+                );
+                renderer.fill_quad(
+                    renderer::Quad {
+                        bounds: top_right,
+                        ..renderer::Quad::default()
+                    },
+                    Background::Color(question_color),
+                );
+                renderer.fill_quad(
+                    renderer::Quad {
+                        bounds: middle,
+                        ..renderer::Quad::default()
+                    },
+                    Background::Color(question_color),
+                );
+                renderer.fill_quad(
+                    renderer::Quad {
+                        bounds: dot,
+                        border: Border {
+                            radius: Radius::from(icon_size * 0.1),
+                            width: 0.0,
+                            color: Color::TRANSPARENT,
+                        },
+                        ..renderer::Quad::default()
+                    },
+                    Background::Color(question_color),
+                );
+            }
         }
+    }
+
+    fn tag(&self) -> tree::Tag {
+        tree::Tag::of::<()>()
+    }
+
+    fn state(&self) -> tree::State {
+        tree::State::new(())
+    }
+
+    fn on_event(
+        &mut self,
+        _tree: &mut Tree,
+        _event: iced::Event,
+        _layout: Layout<'_>,
+        _cursor: mouse::Cursor,
+        _renderer: &Renderer,
+        _clipboard: &mut dyn Clipboard,
+        _shell: &mut Shell<'_, Message>,
+        _viewport: &Rectangle,
+    ) -> iced::event::Status {
+        iced::event::Status::Ignored
     }
 }
 
 impl<'a, Message, Theme, Renderer> From<Battery<Theme>> for Element<'a, Message, Theme, Renderer>
 where
     Theme: StyleSheet + 'a,
-    Renderer: iced::advanced::Renderer + 'a,
+    Renderer: advanced::Renderer + 'a,
 {
     fn from(battery: Battery<Theme>) -> Self {
         Self::new(battery)
@@ -330,6 +428,8 @@ pub struct Appearance {
     pub charge_medium_color: Color,
     /// The color when charge is low (<20%).
     pub charge_low_color: Color,
+    /// The color when battery state is unknown.
+    pub unknown_color: Color,
 }
 
 impl Default for Appearance {
@@ -341,6 +441,7 @@ impl Default for Appearance {
             charge_high_color: Color::from_rgb(0.2, 0.8, 0.2), // Green
             charge_medium_color: Color::from_rgb(0.95, 0.9, 0.2), // Yellow
             charge_low_color: Color::from_rgb(0.9, 0.2, 0.2), // Red
+            unknown_color: Color::from_rgb(0.7, 0.7, 0.7),  // Gray
         }
     }
 }
@@ -358,15 +459,15 @@ impl StyleSheet for iced::Theme {
     type Style = ();
 
     fn appearance(&self, _style: &Self::Style) -> Appearance {
-        let palette = self.extended_palette();
-
+        // Use dark theme colors for the battery widget
         Appearance {
-            background_color: palette.background.weak.color,
-            border_color: palette.background.strong.color,
-            charging_color: Color::from_rgb(0.2, 0.8, 0.9), // Cyan
-            charge_high_color: Color::from_rgb(0.2, 0.8, 0.2), // Green
-            charge_medium_color: Color::from_rgb(0.95, 0.9, 0.2), // Yellow
-            charge_low_color: Color::from_rgb(0.9, 0.2, 0.2), // Red
+            background_color: Color::from_rgb(0.05, 0.05, 0.05), // Very dark background
+            border_color: Color::from_rgb(0.4, 0.4, 0.4),        // Light gray border
+            charging_color: Color::from_rgb(0.0, 0.6, 0.8),      // Cyan for charging
+            charge_high_color: Color::from_rgb(0.0, 0.7, 0.0), // Dark green for high charge (>50%)
+            charge_medium_color: Color::from_rgb(0.8, 0.7, 0.0), // Orange/yellow for medium charge (20-50%)
+            charge_low_color: Color::from_rgb(0.8, 0.0, 0.0),    // Dark red for low charge (<20%)
+            unknown_color: Color::from_rgb(0.5, 0.5, 0.5),       // Medium gray for unknown state
         }
     }
 }

@@ -29,7 +29,7 @@ use crate::{Message, View, icons};
 use iced::widget::scrollable::Scrollbar;
 use iced::widget::text::Shaping::Advanced;
 use iced::widget::{Column, Container, Row, Space, button, row, scrollable, text, text_input};
-use iced::{Bottom, Center, Element, Fill, Padding, Task};
+use iced::{Center, Element, Fill, Padding, Task};
 use meshtastic::Message as _;
 use meshtastic::protobufs::channel::Role;
 use meshtastic::protobufs::channel::Role::*;
@@ -469,7 +469,7 @@ impl DeviceView {
     /// Create a header view for the top of the screen depending on the current state of the app
     /// and whether we are in discovery mode or not.
     pub fn header<'a>(&'a self, state: &'a ConnectionState) -> Element<'a, Message> {
-        let mut header = Row::new().padding(4).align_y(Bottom).push(
+        let mut header = Row::new().padding(4).align_y(Center).push(
             button("Devices")
                 .style(button_chip_style)
                 .on_press(Navigation(DeviceList)),
@@ -497,21 +497,7 @@ impl DeviceView {
                     button = button.on_press(DeviceViewEvent(ShowChannel(None)));
                 }
 
-                header = header.push(button);
-
-                match self.battery_level {
-                    Some(battery_level) if battery_level <= 100 => {
-                        let battery = Battery::new().state(BatteryState::Charged(battery_level));
-                        header = header.push(battery);
-                    }
-                    Some(_) => {
-                        let battery = Battery::new().state(BatteryState::Charging);
-                        header = header.push(battery);
-                    }
-                    None => {}
-                }
-
-                header
+                header.push(button).push(self.battery_level())
             }
             Disconnecting(device) => {
                 let button =
@@ -553,6 +539,17 @@ impl DeviceView {
         }
 
         header.into()
+    }
+
+    /// Return an element that displays the battery level of the connected device
+    fn battery_level(&self) -> Element<'_, Message> {
+        let battery_state = match self.battery_level {
+            Some(battery_level) if battery_level <= 100 => BatteryState::Charged(battery_level),
+            Some(_) => BatteryState::Charging,
+            None => BatteryState::Unknown,
+        };
+
+        Battery::new().state(battery_state).into()
     }
 
     pub fn view(&self, config: &Config) -> Element<'_, Message> {

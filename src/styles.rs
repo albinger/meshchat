@@ -1,5 +1,6 @@
 #![allow(dead_code)] // for extra colors we have generated but not used yet
 
+use crate::battery::Appearance as BatteryAppearance;
 use iced::border::Radius;
 use iced::widget::button::Status;
 use iced::widget::button::Status::Hovered;
@@ -434,5 +435,32 @@ pub fn menu_button_style(_theme: &Theme, _status: iced_aw::style::Status) -> men
         menu_background_expand: Padding::new(0.0),
         path: Background::Color(Color::TRANSPARENT),
         path_border: NO_BORDER,
+    }
+}
+
+/// Battery widget style using dark theme colors
+/// Returns the dark style appearance for the battery widget
+pub fn battery_style(_theme: &Theme) -> BatteryAppearance {
+    BatteryAppearance {
+        background_color: COLOR_GRAY_10,     // Very dark background
+        border_color: COLOR_GRAY_80,         // Light gray border
+        charging_color: COLOR_GREEN,         // Cyan for charging
+        charge_high_color: COLOR_DARK_GREEN, // Dark green for high charge (>50%)
+        charge_medium_color: COLOR_ORANGE,   // Orange for medium charge (20-50%)
+        charge_low_color: COLOR_DARK_RED,    // Dark red for low charge (<20%)
+        unknown_color: COLOR_GRAY_40,        // Medium gray for unknown state
+    }
+}
+
+/// Dark variant battery style
+pub fn battery_style_dark(_theme: &Theme) -> BatteryAppearance {
+    BatteryAppearance {
+        background_color: COLOR_GRAY_10,
+        border_color: COLOR_GRAY_80,
+        charging_color: COLOR_GREEN,
+        charge_high_color: COLOR_DARK_GREEN,
+        charge_medium_color: COLOR_ORANGE,
+        charge_low_color: COLOR_DARK_RED,
+        unknown_color: COLOR_GRAY_40,
     }
 }
