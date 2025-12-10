@@ -45,7 +45,7 @@ pub struct ChannelViewEntry {
     message_id: u32,
     rx_daytime: DateTime<Local>,
     payload: Payload,
-    name: Option<String>,
+    name: String,
     seen: bool,
     acked: bool,
     /// Map of emojis and for each emoji there is the string for it and a number of node ides
@@ -56,13 +56,7 @@ pub struct ChannelViewEntry {
 impl ChannelViewEntry {
     /// Create a new [ChannelViewEntry] from the parameters provided. The received time will be set to
     /// the current time in EPOC as an u64
-    pub fn new(
-        payload: Payload,
-        from: u32,
-        message_id: u32,
-        name: Option<String>,
-        seen: bool,
-    ) -> Self {
+    pub fn new(payload: Payload, from: u32, message_id: u32, name: String, seen: bool) -> Self {
         let rx_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|t| t.as_secs())
@@ -117,11 +111,11 @@ impl ChannelViewEntry {
     }
 
     /// Add an emoji reply to this entry
-    pub fn add_emoji(&mut self, emoji_string: String, emoji_source: String) {
+    pub fn add_emoji(&mut self, emoji_string: String, emoji_source: &str) {
         self.emoji_reply
             .entry(emoji_string)
-            .and_modify(|sender_vec| sender_vec.push(emoji_source.clone()))
-            .or_insert(vec![emoji_source]);
+            .and_modify(|sender_vec| sender_vec.push(emoji_source.into()))
+            .or_insert(vec![emoji_source.into()]);
     }
 
     /// Return true if the radio has acknowledged this message
@@ -140,7 +134,7 @@ impl ChannelViewEntry {
     }
 
     /// Return the optional name of the sender of this message
-    pub fn name(&self) -> &Option<String> {
+    pub fn name(&self) -> &str {
         &self.name
     }
 
@@ -197,27 +191,8 @@ impl ChannelViewEntry {
     ) -> Element<'a, Message> {
         let mut message_content_column = Column::new();
 
-        // Add the source node name if there is one
-        if let Some(name) = &self.name {
-            let text_color = Self::color_from_name(name);
-            let mut top_row = Row::new().padding(0).align_y(Top);
-
-            if !mine {
-                top_row = top_row.push(self.menu_bar()).push(Space::with_width(2.0));
-            }
-
-            top_row = top_row.push(
-                text(name)
-                    .shaping(Advanced)
-                    .font(Font {
-                        weight: Weight::Bold,
-                        ..Default::default()
-                    })
-                    .color(text_color),
-            );
-
-            message_content_column = message_content_column.push(top_row);
-        }
+        // Add the top row with the source node name if there is one
+        message_content_column = self.top_row(message_content_column, mine);
 
         let content: Element<'static, Message> = match self.payload() {
             NewTextMessage(text_msg) => text(text_msg.clone())
@@ -322,6 +297,35 @@ impl ChannelViewEntry {
         message_column.into()
     }
 
+    /// Add a row to the content column with the name of the source node, if any
+    fn top_row<'a>(
+        &'a self,
+        mut message_content_column: Column<'a, Message>,
+        mine: bool,
+    ) -> Column<'a, Message> {
+        // Add the source node name if there is one
+        let text_color = Self::color_from_name(&self.name);
+        let mut top_row = Row::new().padding(0).align_y(Top);
+
+        if !mine {
+            top_row = top_row.push(self.menu_bar()).push(Space::with_width(2.0));
+        }
+
+        top_row = top_row.push(
+            text(&self.name)
+                .shaping(Advanced)
+                .font(Font {
+                    weight: Weight::Bold,
+                    ..Default::default()
+                })
+                .color(text_color),
+        );
+
+        message_content_column = message_content_column.push(top_row);
+
+        message_content_column
+    }
+
     /// Append an element to the column that contains the emoji replies for this message, if any.
     fn emoji_row<'a>(&self, mut message_column: Column<'a, Message>) -> Column<'a, Message> {
         if !self.emojis().is_empty() {
@@ -354,7 +358,7 @@ impl ChannelViewEntry {
     fn menu_bar<'a>(&self) -> MenuBar<'a, Message, Theme, Renderer> {
         let menu_tpl_1 = |items| Menu::new(items).spacing(3);
 
-        let dm = format!("DM with {}", self.name.as_ref().unwrap_or(&"".to_string()));
+        let dm = format!("DM with {}", self.name);
         #[rustfmt::skip]
         let menu_items = menu_items!(
             //(menu_button("forward".into(), Message::None))

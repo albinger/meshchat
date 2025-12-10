@@ -102,7 +102,7 @@ impl ChannelView {
     }
 
     /// Add an emoji reply to a message.
-    fn add_emoji_to(&mut self, request_id: u32, emoji_string: String, source_name: String) {
+    fn add_emoji_to(&mut self, request_id: u32, emoji_string: String, source_name: &str) {
         if let Some(entry) = self.entries.get_mut(&request_id) {
             entry.add_emoji(emoji_string, source_name);
         }
@@ -119,11 +119,7 @@ impl ChannelView {
                 );
             }
             EmojiReply(reply_to_id, emoji_string) => {
-                self.add_emoji_to(
-                    *reply_to_id,
-                    emoji_string.clone(),
-                    new_message.name().clone().unwrap_or("".to_string()),
-                );
+                self.add_emoji_to(*reply_to_id, emoji_string.clone(), new_message.name());
             }
         };
     }
@@ -356,7 +352,7 @@ mod test {
             NewTextMessage("Hello 1".to_string()),
             1,
             1,
-            Some("Source 1".to_string()),
+            "Source 1".to_string(),
             false,
         );
         tokio::time::sleep(Duration::from_millis(1500)).await;
@@ -365,7 +361,7 @@ mod test {
             NewTextMessage("Hello 2".to_string()),
             2,
             1000,
-            Some("Source 2".to_string()),
+            "Source 2".to_string(),
             false,
         );
         tokio::time::sleep(Duration::from_millis(1500)).await;
@@ -374,7 +370,7 @@ mod test {
             NewTextMessage("Hello 3".to_string()),
             1,
             500,
-            Some("Source 1".to_string()),
+            "Source 1".to_string(),
             false,
         );
 

@@ -35,7 +35,7 @@ use meshtastic::protobufs::config::device_config;
 use meshtastic::protobufs::from_radio::PayloadVariant;
 use meshtastic::protobufs::mesh_packet::PayloadVariant::Decoded;
 use meshtastic::protobufs::telemetry::Variant::DeviceMetrics;
-use meshtastic::protobufs::{Channel, FromRadio, MeshPacket, NodeInfo, PortNum, Position};
+use meshtastic::protobufs::{Channel, FromRadio, MeshPacket, NodeInfo, PortNum, Position, User};
 use meshtastic::utils::stream::BleDevice;
 use std::collections::HashMap;
 use tokio::sync::mpsc::Sender;
@@ -354,81 +354,90 @@ impl DeviceView {
                 }
                 Ok(PortNum::AlertApp) => {
                     let channel_id = self.channel_id_from_packet(mesh_packet);
-                    let name = self.short_name(mesh_packet);
-                    if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
-                        let seen = self.viewing_channel == Some(channel_id);
-                        let new_message = ChannelViewEntry::new(
-                            NewTextMessage(String::from_utf8(data.payload.clone()).unwrap()),
-                            mesh_packet.from,
-                            mesh_packet.id,
-                            name,
-                            seen,
-                        );
+                    if let Some(name) = self.short_name(mesh_packet) {
+                        if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
+                            let seen = self.viewing_channel == Some(channel_id);
+                            let new_message = ChannelViewEntry::new(
+                                NewTextMessage(String::from_utf8(data.payload.clone()).unwrap()),
+                                mesh_packet.from,
+                                mesh_packet.id,
+                                name,
+                                seen,
+                            );
 
-                        channel_view.new_message(new_message);
+                            channel_view.new_message(new_message);
+                        } else {
+                            eprintln!("No channel for packet");
+                        }
                     } else {
-                        eprintln!("No channel for packet");
+                        eprintln!("No name for Alert");
                     }
                 }
                 Ok(PortNum::TextMessageApp) => {
                     let channel_id = self.channel_id_from_packet(mesh_packet);
-                    let name = self.short_name(mesh_packet);
-                    if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
-                        let message = if data.reply_id == 0 {
-                            NewTextMessage(String::from_utf8(data.payload.clone()).unwrap())
-                        } else {
-                            // Emoji reply to an earlier message
-                            if data.emoji == 1 {
-                                EmojiReply(
-                                    data.reply_id,
-                                    String::from_utf8(data.payload.clone()).unwrap(),
-                                )
+                    if let Some(name) = self.short_name(mesh_packet) {
+                        if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
+                            let message = if data.reply_id == 0 {
+                                NewTextMessage(String::from_utf8(data.payload.clone()).unwrap())
                             } else {
-                                // Text reply to an earlier message
-                                TextMessageReply(
-                                    data.reply_id,
-                                    String::from_utf8(data.payload.clone()).unwrap(),
-                                )
-                            }
-                        };
+                                // Emoji reply to an earlier message
+                                if data.emoji == 1 {
+                                    EmojiReply(
+                                        data.reply_id,
+                                        String::from_utf8(data.payload.clone()).unwrap(),
+                                    )
+                                } else {
+                                    // Text reply to an earlier message
+                                    TextMessageReply(
+                                        data.reply_id,
+                                        String::from_utf8(data.payload.clone()).unwrap(),
+                                    )
+                                }
+                            };
 
-                        let seen = self.viewing_channel == Some(channel_id);
-                        let new_message = ChannelViewEntry::new(
-                            message,
-                            mesh_packet.from,
-                            mesh_packet.id,
-                            name,
-                            seen,
-                        );
+                            let seen = self.viewing_channel == Some(channel_id);
+                            let new_message = ChannelViewEntry::new(
+                                message,
+                                mesh_packet.from,
+                                mesh_packet.id,
+                                name,
+                                seen,
+                            );
 
-                        channel_view.new_message(new_message);
+                            channel_view.new_message(new_message);
+                        } else {
+                            eprintln!("No channel for packet");
+                        }
                     } else {
-                        eprintln!("No channel for packet");
+                        eprintln!("No name for Text Message");
                     }
                 }
                 Ok(PortNum::PositionApp) => {
                     let position = Position::decode(&data.payload as &[u8]).unwrap();
                     let channel_id = self.channel_id_from_packet(mesh_packet);
                     let seen = self.viewing_channel.as_ref() == Some(&channel_id);
-                    let name = self.short_name(mesh_packet);
-                    self.update_node_position(mesh_packet.from, &position);
-                    if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
-                        if let Some(lat) = position.latitude_i
-                            && let Some(lon) = position.longitude_i
-                        {
-                            let new_message = ChannelViewEntry::new(
-                                PositionMessage(lat, lon),
-                                mesh_packet.from,
-                                mesh_packet.id,
-                                name,
-                                seen,
-                            );
-                            channel_view.new_message(new_message);
+                    if let Some(name) = self.short_name(mesh_packet) {
+                        self.update_node_position(mesh_packet.from, &position);
+                        if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
+                            if let Some(lat) = position.latitude_i
+                                && let Some(lon) = position.longitude_i
+                            {
+                                let new_message = ChannelViewEntry::new(
+                                    PositionMessage(lat, lon),
+                                    mesh_packet.from,
+                                    mesh_packet.id,
+                                    name,
+                                    seen,
+                                );
+                                channel_view.new_message(new_message);
+                            } else {
+                                eprintln!("No lat/lon for Position: {:?}", position);
+                            }
                         } else {
-                            eprintln!("No lat/lon for Position: {:?}", position);
+                            eprintln!("No channel for: {}", channel_id);
                         }
                     } else {
-                        eprintln!("No channel for: {}", channel_id);
+                        eprintln!("No name for Position: {:?}", position);
                     }
                 }
                 Ok(PortNum::TelemetryApp) => {
@@ -444,21 +453,25 @@ impl DeviceView {
                 Ok(PortNum::NodeinfoApp) => {
                     let user = meshtastic::protobufs::User::decode(&data.payload as &[u8]).unwrap();
                     let channel_id = self.channel_id_from_packet(mesh_packet);
-                    let name = self.short_name(mesh_packet);
-                    let seen = self.viewing_channel.as_ref() == Some(&channel_id);
-                    if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
-                        let new_message = ChannelViewEntry::new(
-                            UserMessage(user),
-                            mesh_packet.from,
-                            mesh_packet.id,
-                            name,
-                            seen,
-                        );
-                        channel_view.new_message(new_message);
+                    if let Some(name) = self.short_name(mesh_packet) {
+                        let seen = self.viewing_channel.as_ref() == Some(&channel_id);
+                        if let Some(channel_view) = &mut self.channel_views.get_mut(&channel_id) {
+                            let new_message = ChannelViewEntry::new(
+                                UserMessage(user),
+                                mesh_packet.from,
+                                mesh_packet.id,
+                                name,
+                                seen,
+                            );
+                            channel_view.new_message(new_message);
+                        } else {
+                            eprintln!("NodeInfoApp: No channel for: {}", user.long_name);
+                        }
                     } else {
-                        eprintln!("NodeInfoApp: No channel for: {}", user.long_name);
+                        eprintln!("No name for user: {:?}", user);
                     }
                 }
+
                 _ => eprintln!("Unexpected payload type from radio: {}", data.portnum),
             }
         }
@@ -469,13 +482,10 @@ impl DeviceView {
     /// Return an Optional name to display in the message box as the source of a message.
     /// If the message is from myself, then return None.
     fn short_name(&self, mesh_packet: &MeshPacket) -> Option<String> {
-        if Some(mesh_packet.from) == self.my_node_num {
-            return None;
-        }
-
         self.nodes
             .get(&mesh_packet.from)
-            .map(|node_info| node_info.user.as_ref().unwrap().short_name.clone())
+            .and_then(|node_info: &NodeInfo| node_info.user.as_ref())
+            .map(|user: &User| user.short_name.clone())
     }
 
     /// If the Node is known already, then update its Position with a PositionApp update
