@@ -367,7 +367,7 @@ pub fn name_box_style(_theme: &Theme) -> Style {
 const REPLY_TO_STYLE: Style = Style {
     text_color: Some(Color::WHITE),
     background: Some(Background::Color(Color::from_rgba(0.08, 0.3, 0.22, 1.0))),
-    border: MESSAGE_BORDER,
+    border: NO_BORDER,
     shadow: NO_SHADOW,
 };
 
@@ -429,8 +429,8 @@ pub fn menu_button_style(_theme: &Theme, _status: iced_aw::style::Status) -> men
         bar_border: NO_BORDER,
         bar_shadow: NO_SHADOW,
         bar_background_expand: Padding::new(0.0),
-        menu_background: Background::Color(Color::TRANSPARENT),
-        menu_border: NO_BORDER,
+        menu_background: Background::Color(Color::BLACK),
+        menu_border: BUTTON_BORDER_DISABLED,
         menu_shadow: NO_SHADOW,
         menu_background_expand: Padding::new(0.0),
         path: Background::Color(Color::TRANSPARENT),
