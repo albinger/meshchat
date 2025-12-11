@@ -104,6 +104,12 @@ pub const NO_BORDER: Border = Border {
     radius: RADIUS_2,
 };
 
+pub const CYAN_BORDER: Border = Border {
+    color: CYAN,
+    width: 2.0,
+    radius: RADIUS_2,
+};
+
 pub const RADIUS_12: Radius = Radius {
     top_left: 12.0,
     top_right: 12.0,
@@ -468,9 +474,15 @@ pub fn battery_style_dark(_theme: &Theme) -> BatteryAppearance {
 
 pub fn scrollbar_style(_theme: &Theme, status: scrollable::Status) -> scrollable::Style {
     let scrollbar_color = match status {
-        scrollable::Status::Active => COLOR_GRAY_80,
-        scrollable::Status::Hovered { .. } => CYAN,
+        scrollable::Status::Active => Color::TRANSPARENT,
+        scrollable::Status::Hovered { .. } => COLOR_GRAY_80,
         scrollable::Status::Dragged { .. } => CYAN,
+    };
+
+    let border = match status {
+        scrollable::Status::Active => NO_BORDER,
+        scrollable::Status::Hovered { .. } => CYAN_BORDER,
+        scrollable::Status::Dragged { .. } => NO_BORDER,
     };
 
     scrollable::Style {
@@ -485,7 +497,7 @@ pub fn scrollbar_style(_theme: &Theme, status: scrollable::Status) -> scrollable
             border: NO_BORDER,
             scroller: Scroller {
                 color: scrollbar_color,
-                border: NO_BORDER,
+                border: border,
             },
         },
         horizontal_rail: Rail {
@@ -493,7 +505,7 @@ pub fn scrollbar_style(_theme: &Theme, status: scrollable::Status) -> scrollable
             border: NO_BORDER,
             scroller: Scroller {
                 color: scrollbar_color,
-                border: NO_BORDER,
+                border: border,
             },
         },
         gap: None,
