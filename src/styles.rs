@@ -5,7 +5,8 @@ use iced::border::Radius;
 use iced::widget::button::Status;
 use iced::widget::button::Status::Hovered;
 use iced::widget::container::Style;
-use iced::widget::{button, text, text_input};
+use iced::widget::scrollable::{Rail, Scroller};
+use iced::widget::{button, scrollable, text, text_input};
 use iced::{Background, Border, Color, Padding, Shadow, Theme};
 use iced_aw::menu;
 
@@ -100,6 +101,12 @@ pub const NO_SHADOW: Shadow = Shadow {
 pub const NO_BORDER: Border = Border {
     color: Color::TRANSPARENT,
     width: 0.0,
+    radius: RADIUS_2,
+};
+
+pub const CYAN_BORDER: Border = Border {
+    color: CYAN,
+    width: 2.0,
     radius: RADIUS_2,
 };
 
@@ -462,5 +469,45 @@ pub fn battery_style_dark(_theme: &Theme) -> BatteryAppearance {
         charge_medium_color: COLOR_ORANGE,
         charge_low_color: COLOR_RED,
         unknown_color: COLOR_GRAY_40,
+    }
+}
+
+pub fn scrollbar_style(_theme: &Theme, status: scrollable::Status) -> scrollable::Style {
+    let scrollbar_color = match status {
+        scrollable::Status::Active => Color::TRANSPARENT,
+        scrollable::Status::Hovered { .. } => COLOR_GRAY_80,
+        scrollable::Status::Dragged { .. } => CYAN,
+    };
+
+    let border = match status {
+        scrollable::Status::Active => NO_BORDER,
+        scrollable::Status::Hovered { .. } => CYAN_BORDER,
+        scrollable::Status::Dragged { .. } => NO_BORDER,
+    };
+
+    scrollable::Style {
+        container: Style {
+            text_color: None,
+            background: Some(Background::Color(Color::TRANSPARENT)),
+            border: NO_BORDER,
+            shadow: NO_SHADOW,
+        },
+        vertical_rail: Rail {
+            background: Some(Background::Color(Color::TRANSPARENT)),
+            border: NO_BORDER,
+            scroller: Scroller {
+                color: scrollbar_color,
+                border: border,
+            },
+        },
+        horizontal_rail: Rail {
+            background: Some(Background::Color(Color::TRANSPARENT)),
+            border: NO_BORDER,
+            scroller: Scroller {
+                color: scrollbar_color,
+                border: border,
+            },
+        },
+        gap: None,
     }
 }
