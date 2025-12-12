@@ -1,5 +1,6 @@
 use crate::Message;
 use crate::Message::{CopyToClipBoard, DeviceViewEvent, ShowLocation};
+use crate::channel_view::ChannelViewMessage::MessageSeen;
 use crate::channel_view::{ChannelId, ChannelViewMessage};
 use crate::channel_view_entry::Payload::{
     AlertMessage, EmojiReply, NewTextMessage, PositionMessage, TextMessageReply, UserMessage,
@@ -14,7 +15,7 @@ use chrono::{DateTime, Local, Utc};
 use iced::Length::Fixed;
 use iced::advanced::text::Shaping::Advanced;
 use iced::font::Weight;
-use iced::widget::{Column, Container, Row, Space, Text, button, text, tooltip};
+use iced::widget::{Column, Container, Row, Space, Text, button, sensor, text, tooltip};
 use iced::{Bottom, Color, Element, Fill, Font, Left, Padding, Renderer, Right, Theme, Top};
 use iced_aw::menu::Menu;
 use iced_aw::{MenuBar, menu_bar, menu_items};
@@ -22,6 +23,7 @@ use meshtastic::protobufs::{NodeInfo, User};
 use ringmap::RingMap;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::default::Default;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -37,16 +39,28 @@ pub enum Payload {
     UserMessage(User),
 }
 
+impl Default for Payload {
+    fn default() -> Self {
+        NewTextMessage(String::default())
+    }
+}
+
 /// An entry in the Channel View that represents some type of message sent to either this user on
 /// this device or to a channel this device can read. Can be any of [Payload] types.
 #[allow(dead_code)] // Remove when the 'seen' field is used
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ChannelViewEntry {
+    /// NodeId of the node that sent this message
     from: u32,
+    // Unique message ID for this message
     message_id: u32,
+    /// The daytime the message was sent/received
     rx_daytime: DateTime<Local>,
+    /// The message contents of differing types
     payload: Payload,
-    seen: bool,
+    /// Has the user of the app seen this message?
+    pub seen: bool,
+    /// Has the entry been acknowledged as received by a receiver?
     acked: bool,
     /// Map of emojis and for each emoji there is the string for it and a number of node ids
     /// who sent that emoji
@@ -56,7 +70,7 @@ pub struct ChannelViewEntry {
 impl ChannelViewEntry {
     /// Create a new [ChannelViewEntry] from the parameters provided. The received time will be set to
     /// the current time in EPOC as an u64
-    pub fn new(payload: Payload, from: u32, message_id: u32, seen: bool) -> Self {
+    pub fn new(payload: Payload, from: u32, message_id: u32) -> Self {
         let rx_time = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|t| t.as_secs())
@@ -70,9 +84,7 @@ impl ChannelViewEntry {
             from,
             message_id,
             rx_daytime,
-            seen,
-            acked: false,
-            emoji_reply: HashMap::new(),
+            ..Default::default()
         }
     }
     /// Return the node id that sent the message
@@ -191,13 +203,11 @@ impl ChannelViewEntry {
     ) -> Element<'a, Message> {
         let mut col = Column::new();
         for source in sources {
-            if let Some(name) = Self::short_name(nodes, *source) {
-                col = col.push(
-                    text(name)
-                        .color(Self::color_from_id(*source))
-                        .shaping(Advanced),
-                );
-            }
+            col = col.push(
+                text(Self::short_name(nodes, *source))
+                    .color(Self::color_from_id(*source))
+                    .shaping(Advanced),
+            );
         }
         col.into()
     }
@@ -207,9 +217,10 @@ impl ChannelViewEntry {
         &'a self,
         entries: &'a RingMap<u32, ChannelViewEntry>,
         nodes: &'a HashMap<u32, NodeInfo>,
+        channel_id: &'a ChannelId,
         mine: bool,
-    ) -> Option<Element<'a, Message>> {
-        let name = Self::short_name(nodes, self.from)?;
+    ) -> Element<'a, Message> {
+        let name = Self::short_name(nodes, self.from);
 
         let mut message_content_column = Column::new();
 
@@ -332,7 +343,11 @@ impl ChannelViewEntry {
         // Add the emoji row outside the bubble, below it
         message_column = self.emoji_row(nodes, message_column);
 
-        Some(message_column.into())
+        sensor(message_column)
+            .on_show(|_| {
+                DeviceViewEvent(ChannelMsg(MessageSeen(channel_id.clone(), self.message_id)))
+            })
+            .into()
     }
 
     fn user_text(user: &User) -> String {
@@ -380,11 +395,12 @@ impl ChannelViewEntry {
 
     /// Return an Optional name to display in the message box as the source of a message.
     /// If the message is from myself, then return None.
-    fn short_name(nodes: &HashMap<u32, NodeInfo>, from: u32) -> Option<&str> {
+    fn short_name(nodes: &HashMap<u32, NodeInfo>, from: u32) -> &str {
         nodes
             .get(&from)
             .and_then(|node_info: &NodeInfo| node_info.user.as_ref())
             .map(|user: &User| user.short_name.as_ref())
+            .unwrap_or("????")
     }
 
     /// Append an element to the column that contains the emoji replies for this message, if any.

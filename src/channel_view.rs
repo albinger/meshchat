@@ -1,7 +1,7 @@
 use crate::Message::DeviceViewEvent;
 use crate::channel_view::ChannelId::{Channel, Node};
 use crate::channel_view::ChannelViewMessage::{
-    CancelPrepareReply, ClearMessage, MessageInput, PrepareReply, SendMessage,
+    CancelPrepareReply, ClearMessage, MessageInput, MessageSeen, PrepareReply, SendMessage,
 };
 use crate::channel_view_entry::Payload::{
     AlertMessage, EmojiReply, NewTextMessage, PositionMessage, TextMessageReply, UserMessage,
@@ -39,6 +39,7 @@ pub enum ChannelViewMessage {
     SendMessage(Option<u32>), // optional message id if we are replying to that message
     PrepareReply(u32),        // entry_id
     CancelPrepareReply,
+    MessageSeen(ChannelId, u32),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
@@ -135,7 +136,9 @@ impl ChannelView {
 
     /// Return the number of messages in the channel
     pub fn num_unseen_messages(&self) -> usize {
-        self.entries.len()
+        self.entries
+            .values()
+            .fold(0, |acc, e| if !e.seen { acc + 1 } else { acc })
     }
 
     /// Update the [ChannelView] state based on a [ChannelViewMessage]
@@ -176,6 +179,12 @@ impl ChannelView {
                 self.preparing_reply = None;
                 Task::none()
             }
+            MessageSeen(_, message_id) => {
+                if let Some(channel_view_entry) = self.entries.get_mut(&message_id) {
+                    channel_view_entry.seen = true;
+                }
+                Task::none()
+            }
         }
     }
 
@@ -200,11 +209,12 @@ impl ChannelView {
                 previous_day = message_day;
             }
 
-            if let Some(element) =
-                entry.view(&self.entries, nodes, entry.source_node(self.my_source))
-            {
-                channel_view = channel_view.push(element);
-            }
+            channel_view = channel_view.push(entry.view(
+                &self.entries,
+                nodes,
+                &self.channel_id,
+                entry.source_node(self.my_source),
+            ));
         }
 
         // Wrap the list of messages in a scrollable container, with a scrollbar
@@ -386,16 +396,13 @@ mod test {
 
         // create a set of messages with more than a second between them
         // message ids are not in order
-        let oldest_message =
-            ChannelViewEntry::new(NewTextMessage("Hello 1".to_string()), 1, 1, false);
+        let oldest_message = ChannelViewEntry::new(NewTextMessage("Hello 1".to_string()), 1, 1);
         tokio::time::sleep(Duration::from_millis(1500)).await;
 
-        let middle_message =
-            ChannelViewEntry::new(NewTextMessage("Hello 2".to_string()), 2, 1000, false);
+        let middle_message = ChannelViewEntry::new(NewTextMessage("Hello 2".to_string()), 2, 1000);
         tokio::time::sleep(Duration::from_millis(1500)).await;
 
-        let newest_message =
-            ChannelViewEntry::new(NewTextMessage("Hello 3".to_string()), 1, 500, false);
+        let newest_message = ChannelViewEntry::new(NewTextMessage("Hello 3".to_string()), 1, 500);
 
         // Add them in order
         channel_view.new_message(oldest_message.clone());
