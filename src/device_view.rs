@@ -552,7 +552,7 @@ impl DeviceView {
         let (battery_state, tooltip_text) = match self.battery_level {
             Some(battery_level) if battery_level <= 100 => (
                 BatteryState::Charged(battery_level),
-                format!("Charged: {}%", battery_level),
+                format!("Charge {}%", battery_level),
             ),
             Some(_) => (BatteryState::Charging, "Charging".into()),
             None => (BatteryState::Unknown, "Battery Level Unknown".into()),

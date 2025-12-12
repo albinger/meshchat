@@ -146,12 +146,20 @@ impl ChannelViewEntry {
             })
             .map(|mut text| {
                 if text.len() > 20 {
-                    text.truncate(20);
+                    text = Self::truncate(&text, 20).to_string();
                     format!("{} ...", text)
                 } else {
                     text
                 }
             })
+    }
+
+    /// Truncate a String at a character boundary
+    fn truncate(s: &str, max_chars: usize) -> &str {
+        match s.char_indices().nth(max_chars) {
+            None => s,
+            Some((idx, _)) => &s[..idx],
+        }
     }
 
     /// Hash the node name into a color index - to be able to assign a consistent color to the text
