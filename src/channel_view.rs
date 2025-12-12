@@ -1,7 +1,7 @@
 use crate::Message::DeviceViewEvent;
 use crate::channel_view::ChannelId::{Channel, Node};
 use crate::channel_view::ChannelViewMessage::{
-    CancelPrepareReply, ClearMessage, MessageInput, PrepareReply, SendMessage,
+    CancelPrepareReply, ClearMessage, MessageInput, MessageSeen, PrepareReply, SendMessage,
 };
 use crate::channel_view_entry::Payload::{
     AlertMessage, EmojiReply, NewTextMessage, PositionMessage, TextMessageReply, UserMessage,
@@ -39,6 +39,7 @@ pub enum ChannelViewMessage {
     SendMessage(Option<u32>), // optional message id if we are replying to that message
     PrepareReply(u32),        // entry_id
     CancelPrepareReply,
+    MessageSeen(ChannelId, u32),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
@@ -178,6 +179,12 @@ impl ChannelView {
                 self.preparing_reply = None;
                 Task::none()
             }
+            MessageSeen(_, message_id) => {
+                if let Some(channel_view_entry) = self.entries.get_mut(&message_id) {
+                    channel_view_entry.seen = true;
+                }
+                Task::none()
+            }
         }
     }
 
@@ -205,6 +212,7 @@ impl ChannelView {
             channel_view = channel_view.push(entry.view(
                 &self.entries,
                 nodes,
+                &self.channel_id,
                 entry.source_node(self.my_source),
             ));
         }

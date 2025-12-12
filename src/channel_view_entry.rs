@@ -1,5 +1,6 @@
 use crate::Message;
 use crate::Message::{CopyToClipBoard, DeviceViewEvent, ShowLocation};
+use crate::channel_view::ChannelViewMessage::MessageSeen;
 use crate::channel_view::{ChannelId, ChannelViewMessage};
 use crate::channel_view_entry::Payload::{
     AlertMessage, EmojiReply, NewTextMessage, PositionMessage, TextMessageReply, UserMessage,
@@ -14,7 +15,7 @@ use chrono::{DateTime, Local, Utc};
 use iced::Length::Fixed;
 use iced::advanced::text::Shaping::Advanced;
 use iced::font::Weight;
-use iced::widget::{Column, Container, Row, Space, Text, button, text, tooltip};
+use iced::widget::{Column, Container, Row, Space, Text, button, sensor, text, tooltip};
 use iced::{Bottom, Color, Element, Fill, Font, Left, Padding, Renderer, Right, Theme, Top};
 use iced_aw::menu::Menu;
 use iced_aw::{MenuBar, menu_bar, menu_items};
@@ -94,11 +95,6 @@ impl ChannelViewEntry {
     /// Get a reference to the payload of this message
     pub fn payload(&self) -> &Payload {
         &self.payload
-    }
-
-    /// Mark this entry as having been seen by the user
-    pub fn set_seen(&mut self) {
-        self.seen = true;
     }
 
     /// Return true if this message was sent from the specified node id
@@ -221,6 +217,7 @@ impl ChannelViewEntry {
         &'a self,
         entries: &'a RingMap<u32, ChannelViewEntry>,
         nodes: &'a HashMap<u32, NodeInfo>,
+        channel_id: &'a ChannelId,
         mine: bool,
     ) -> Element<'a, Message> {
         let name = Self::short_name(nodes, self.from);
@@ -346,7 +343,11 @@ impl ChannelViewEntry {
         // Add the emoji row outside the bubble, below it
         message_column = self.emoji_row(nodes, message_column);
 
-        message_column.into()
+        sensor(message_column)
+            .on_show(|_| {
+                DeviceViewEvent(ChannelMsg(MessageSeen(channel_id.clone(), self.message_id)))
+            })
+            .into()
     }
 
     fn user_text(user: &User) -> String {
