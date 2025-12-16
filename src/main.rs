@@ -116,7 +116,7 @@ impl MeshChat {
             Navigation(view) => self.navigate(view),
             WindowEvent(event) => self.window_handler(event),
             DeviceListViewEvent(discovery_event) => self.device_list_view.update(discovery_event),
-            DeviceViewEvent(device_event) => self.device_view.update(device_event),
+            DeviceViewEvent(device_event) => self.device_view.update(&self.config, device_event),
             Exit => window::latest().and_then(window::close),
             AppNotification(summary, detail) => {
                 self.notifications.add(Notification::Info(summary, detail));
@@ -130,10 +130,13 @@ impl MeshChat {
             NewConfig(config) => {
                 self.config = config;
                 if let Some(device) = &self.config.device {
-                    self.device_view.update(DeviceViewMessage::ConnectRequest(
-                        device.clone(),
-                        self.config.channel_id.clone(),
-                    ))
+                    self.device_view.update(
+                        &self.config,
+                        DeviceViewMessage::ConnectRequest(
+                            device.clone(),
+                            self.config.channel_id.clone(),
+                        ),
+                    )
                 } else {
                     Task::none()
                 }
@@ -224,8 +227,10 @@ impl MeshChat {
     fn navigate(&mut self, view: View) -> Task<Message> {
         self.current_view = view.clone();
         if let View::Device(Some(channel_id)) = view {
-            self.device_view
-                .update(DeviceViewMessage::ShowChannel(Some(channel_id)))
+            self.device_view.update(
+                &self.config,
+                DeviceViewMessage::ShowChannel(Some(channel_id)),
+            )
         } else {
             Task::none()
         }
@@ -236,7 +241,7 @@ impl MeshChat {
         if let Event::Window(window::Event::CloseRequested) = event {
             if let Connected(device) = self.device_view.connection_state() {
                 self.device_view
-                    .update(DisconnectRequest(device.clone(), true))
+                    .update(&self.config, DisconnectRequest(device.clone(), true))
             } else {
                 window::latest().and_then(window::close)
             }

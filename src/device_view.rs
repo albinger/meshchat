@@ -127,7 +127,11 @@ impl DeviceView {
     }
 
     /// Return a true value to show we can show the device view, false for main to decide
-    pub fn update(&mut self, device_view_message: DeviceViewMessage) -> Task<Message> {
+    pub fn update(
+        &mut self,
+        config: &Config,
+        device_view_message: DeviceViewMessage,
+    ) -> Task<Message> {
         match device_view_message {
             ConnectRequest(device, channel_id) => {
                 // save the desired channel to show for when the connection is completed later
@@ -161,7 +165,7 @@ impl DeviceView {
                 }
             }
             SubscriptionMessage(subscription_event) => {
-                return self.process_subscription_event(subscription_event);
+                return self.process_subscription_event(config, subscription_event);
             }
             SendTextMessage(message, index, reply_to_id) => {
                 if let Some(sender) = self.subscription_sender.clone() {
@@ -205,6 +209,7 @@ impl DeviceView {
     /// Process an event sent by the subscription connected to the radio
     fn process_subscription_event(
         &mut self,
+        config: &Config,
         subscription_event: SubscriptionEvent,
     ) -> Task<Message> {
         match subscription_event {
@@ -244,7 +249,7 @@ impl DeviceView {
                 self.subscription_sender = Some(sender);
                 Task::none()
             }
-            DevicePacket(packet) => self.handle_from_radio(packet),
+            DevicePacket(packet) => self.handle_from_radio(config, packet),
             DeviceMeshPacket(packet) => self.handle_mesh_packet(&packet),
             ConnectionError(id, summary, detail) => {
                 self.connection_state = Disconnected(Some(id), Some(summary.clone()));
@@ -257,7 +262,7 @@ impl DeviceView {
     }
 
     /// Handle [FromRadio] packets coming from the radio, forwarded from the device_subscription
-    fn handle_from_radio(&mut self, packet: Box<FromRadio>) -> Task<Message> {
+    fn handle_from_radio(&mut self, config: &Config, packet: Box<FromRadio>) -> Task<Message> {
         match packet.payload_variant {
             Some(PayloadVariant::Packet(mesh_packet)) => {
                 return self.handle_mesh_packet(&mesh_packet);
@@ -266,7 +271,7 @@ impl DeviceView {
                 self.my_node_num = Some(my_node_info.my_node_num);
             }
             // Information about a Node that exists on the radio - which could be myself
-            Some(PayloadVariant::NodeInfo(node_info)) => self.add_node(node_info),
+            Some(PayloadVariant::NodeInfo(node_info)) => self.add_node(config, node_info),
             // This Packet conveys information about a Channel that exists on the radio
             Some(PayloadVariant::Channel(channel)) => self.add_channel(channel),
             Some(PayloadVariant::ClientNotification(notification)) => {
@@ -288,7 +293,7 @@ impl DeviceView {
     }
 
     // Add a new node to the list if it has the User info we want and is not marked to be ignored
-    fn add_node(&mut self, node_info: NodeInfo) {
+    fn add_node(&mut self, config: &Config, mut node_info: NodeInfo) {
         if Some(node_info.num) == self.my_node_num {
             self.my_position = node_info.position;
             self.my_info = true;
@@ -298,11 +303,19 @@ impl DeviceView {
             && node_info.user.as_ref().map(|u| u.role()) == Some(device_config::Role::Client)
         {
             let channel_id = Node(node_info.num);
+            self.apply_alias(config, &mut node_info);
             self.nodes.insert(node_info.num, node_info);
             self.channel_views.insert(
                 channel_id.clone(),
                 ChannelView::new(channel_id, self.my_node_num.unwrap()),
             );
+        }
+    }
+
+    /// If there is a stored alias for this node, apply it to the NodeInfo to change its name
+    fn apply_alias(&mut self, config: &Config, node_info: &mut NodeInfo) {
+        if let Some(alias) = config.aliases.get(&node_info.num) {
+            node_info.user.as_mut().unwrap().short_name = alias.clone();
         }
     }
 
