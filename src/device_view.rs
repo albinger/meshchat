@@ -34,7 +34,7 @@ use iced::widget::text::Shaping::Advanced;
 use iced::widget::{
     Column, Container, Row, Space, button, container, row, scrollable, text, text_input, tooltip,
 };
-use iced::{Center, Element, Fill, Padding, Task};
+use iced::{Bottom, Center, Element, Fill, Padding, Task};
 use meshtastic::Message as _;
 use meshtastic::protobufs::channel::Role;
 use meshtastic::protobufs::channel::Role::*;
@@ -849,6 +849,7 @@ impl DeviceView {
             text_input("Enter node alias", &self.alias)
                 .on_input(|s| DeviceViewEvent(AliasInput(s)))
                 .on_submit(AddNodeAlias(editing_node_id, self.alias.clone()))
+                .style(text_input_style)
                 .into()
         } else {
             text(name.to_string()).shaping(Advanced).into()
@@ -858,14 +859,21 @@ impl DeviceView {
             .push("📱  ")
             .push(name_element)
             .push(Space::new().width(4))
-            .push(Self::unread_counter(num_messages));
+            .push(Self::unread_counter(num_messages))
+            .align_y(Center);
 
-        let mut node_row = Row::new().push(
-            button(name_row)
-                .on_press(DeviceViewEvent(ShowChannel(Some(Node(node_id)))))
-                .width(Fill)
-                .style(channel_row_style),
-        );
+        let mut node_row = Row::new().align_y(Bottom);
+
+        node_row = if self.editing_alias.is_none() {
+            node_row.push(
+                button(name_row)
+                    .on_press(DeviceViewEvent(ShowChannel(Some(Node(node_id)))))
+                    .width(Fill)
+                    .style(channel_row_style),
+            )
+        } else {
+            node_row.push(name_row)
+        };
 
         // Add a button to add or remove an alias for this node '👤'
         let (tooltip_text, message) = if config.aliases.contains_key(&node_id) {
