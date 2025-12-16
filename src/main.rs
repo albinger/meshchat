@@ -169,6 +169,7 @@ impl MeshChat {
             }
             CopyToClipBoard(string) => clipboard::write(string),
             AddNodeAlias(node_id, alias) => {
+                self.device_view.stop_editing_alias();
                 self.config.aliases.insert(node_id, alias);
                 save_config(&self.config)
             }

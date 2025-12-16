@@ -15,8 +15,8 @@ use crate::device_subscription::SubscriptionEvent::{
 use crate::device_subscription::{SubscriberMessage, SubscriptionEvent};
 use crate::device_view::ConnectionState::{Connected, Connecting, Disconnected, Disconnecting};
 use crate::device_view::DeviceViewMessage::{
-    ChannelMsg, ConnectRequest, DisconnectRequest, SearchInput, SendInfoMessage,
-    SendPositionMessage, SendTextMessage, ShowChannel, SubscriptionMessage,
+    AliasInput, ChannelMsg, ConnectRequest, DisconnectRequest, SearchInput, SendInfoMessage,
+    SendPositionMessage, SendTextMessage, ShowChannel, StartEditingAlias, SubscriptionMessage,
 };
 
 use crate::ConfigChangeMessage::DeviceAndChannel;
@@ -72,6 +72,8 @@ pub enum DeviceViewMessage {
     SendPositionMessage(ChannelId),
     SendInfoMessage(ChannelId),
     SearchInput(String),
+    StartEditingAlias(u32),
+    AliasInput(String),
 }
 
 #[derive(Default)]
@@ -89,6 +91,8 @@ pub struct DeviceView {
     filter: String,
     exit_pending: bool,
     battery_level: Option<u32>,
+    editing_alias: Option<u32>,
+    alias: String,
 }
 
 async fn request_connection(sender: Sender<SubscriberMessage>, device: BleDevice) {
@@ -196,12 +200,24 @@ impl DeviceView {
                     return channel_view.update(msg);
                 }
             }
-            SearchInput(filter) => {
-                self.filter = filter;
-            }
+            SearchInput(filter) => self.filter = filter,
+            AliasInput(alias) => self.alias = alias,
+            StartEditingAlias(node_id) => self.start_editing_alias(node_id),
         }
 
         Task::none()
+    }
+
+    /// Called when the user selects to alias a node name
+    fn start_editing_alias(&mut self, node_id: u32) {
+        self.editing_alias = Some(node_id);
+        self.alias = String::new();
+    }
+
+    /// Called from above when we have finished editing the alias
+    pub fn stop_editing_alias(&mut self) {
+        self.editing_alias = None;
+        self.alias = String::new();
     }
 
     /// Process an event sent by the subscription connected to the radio
@@ -821,17 +837,25 @@ impl DeviceView {
 
         let name_element: Element<'a, Message> = if let Some(alias) = config.aliases.get(&node_id) {
             tooltip(
-                text(format!("📱  {}", alias)).shaping(Advanced),
-                text(format!("📱  {}", name)).shaping(Advanced),
+                text(alias).shaping(Advanced),
+                text(name.to_string()).shaping(Advanced),
                 tooltip::Position::Right,
             )
             .style(tooltip_style)
             .into()
+        } else if let Some(editing_node_id) = self.editing_alias
+            && editing_node_id == node_id
+        {
+            text_input("Enter node alias", &self.alias)
+                .on_input(|s| DeviceViewEvent(AliasInput(s)))
+                .on_submit(AddNodeAlias(editing_node_id, self.alias.clone()))
+                .into()
         } else {
-            text(format!("📱  {}", name)).shaping(Advanced).into()
+            text(name.to_string()).shaping(Advanced).into()
         };
 
         let name_row = Row::new()
+            .push("📱  ")
             .push(name_element)
             .push(Space::new().width(4))
             .push(Self::unread_counter(num_messages));
@@ -849,7 +873,7 @@ impl DeviceView {
         } else {
             (
                 "Add an alias for this node",
-                AddNodeAlias(node_id, "Aliased".to_string()),
+                DeviceViewEvent(StartEditingAlias(node_id)),
             )
         };
 
