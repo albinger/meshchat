@@ -5,7 +5,7 @@ use crate::channel_view::{ChannelId, ChannelViewMessage};
 use crate::channel_view_entry::Payload::{
     AlertMessage, EmojiReply, NewTextMessage, PositionMessage, TextMessageReply, UserMessage,
 };
-use crate::device_view::DeviceViewMessage::{ChannelMsg, ShowChannel};
+use crate::device_view::DeviceViewMessage::{ChannelMsg, Forward, ShowChannel};
 use crate::styles::{
     COLOR_DICTIONARY, COLOR_GREEN, MY_MESSAGE_BUBBLE_STYLE, OTHERS_MESSAGE_BUBBLE_STYLE,
     TIME_TEXT_COLOR, TIME_TEXT_SIZE, TIME_TEXT_WIDTH, alert_message_style, button_chip_style,
@@ -393,7 +393,7 @@ impl ChannelViewEntry {
         message_content_column.push(top_row)
     }
 
-    /// Return an name to display in the message box as the source of a message.
+    /// Return a name to display in the message box as the source of a message.
     /// If the message is from myself, then return None.
     fn short_name(nodes: &HashMap<u32, NodeInfo>, from: u32) -> &str {
         nodes
@@ -444,11 +444,11 @@ impl ChannelViewEntry {
         let menu_tpl_1 = |items| Menu::new(items).spacing(3);
 
         let dm = format!("DM with {}", name);
-        //(menu_button("forward".into(), Message::None))
         //(menu_button("react".into(), Message::None))
         #[rustfmt::skip]
         let menu_items = menu_items!(
             (menu_button("copy".into(), CopyToClipBoard(message.to_string()))),
+            (menu_button("forward".into(), DeviceViewEvent(Forward(self.clone())))),
             (menu_button("reply".into(), DeviceViewEvent(ChannelMsg(ChannelViewMessage::PrepareReply(self.message_id))))),
             (menu_button(dm, DeviceViewEvent(ShowChannel(Some(ChannelId::Node(self.from()))))))
         );
