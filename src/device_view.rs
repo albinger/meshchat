@@ -675,13 +675,9 @@ impl DeviceView {
 
     /// Count all the unread messages available to this device across channels and nodes
     pub fn unread_count(&self) -> usize {
-        let mut unread_count = 0;
-
-        for channel in self.channel_views.values() {
-            unread_count += channel.num_unseen_messages();
-        }
-
-        unread_count
+        self.channel_views
+            .values()
+            .fold(0, |acc, channel| acc + channel.num_unseen_messages())
     }
 
     /// Create the Element that shows the channels, nodes, etc.
