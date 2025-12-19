@@ -67,7 +67,6 @@ overflow-checks = false
 [package.metadata.bundle]
 identifier = "meshchat.mackenzie-serres.net"
 icon = ["assets/images/icon.png"]
-#resources = ["assets/fonts/icons.ttf"]
 resources = []
 category = "public.app-category.social-networking" # would prefer to find a better category
 short_description = "An application for chatting on the Meshtastic LoRa MESH via connected Bluetooth LE radios"
