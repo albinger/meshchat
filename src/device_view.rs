@@ -139,6 +139,17 @@ impl DeviceView {
         &self.connection_state
     }
 
+    /// Cancel or Exit any interactive modes underway
+    pub fn cancel_interactive(&mut self) {
+        self.stop_editing_alias();
+        self.forwarding_message = None;
+        if let Some(viewing_channel) = &self.viewing_channel
+            && let Some(channel_view) = self.channel_views.get_mut(viewing_channel)
+        {
+            channel_view.cancel_interactive();
+        }
+    }
+
     /// Return a true value to show we can show the device view, false for main to decide
     pub fn update(&mut self, device_view_message: DeviceViewMessage) -> Task<Message> {
         match device_view_message {
