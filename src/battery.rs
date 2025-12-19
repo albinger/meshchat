@@ -166,7 +166,7 @@ where
 
         // Battery terminal (right side protrusion)
         let battery_terminal = Rectangle {
-            x: bounds.x + bounds.width - terminal_width,
+            x: bounds.x + battery_body.width - (border_width / 2.0),
             y: bounds.y + terminal_offset,
             width: terminal_width,
             height: terminal_height,
@@ -276,7 +276,7 @@ where
                         renderer::Quad {
                             bounds: charge_fill,
                             border: Border {
-                                radius: Radius::from(1.0),
+                                radius: Radius::from(0.0),
                                 width: 0.0,
                                 color: Color::TRANSPARENT,
                             },
