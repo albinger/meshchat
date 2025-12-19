@@ -779,11 +779,15 @@ impl DeviceView {
         for fav_node_id in &config.fav_nodes {
             if let Some(node_name) = self.aliased_long_name(config, *fav_node_id) {
                 // If there is a filter and the Username does not contain it, don't show this row
+                // Note that all Strings contain the empty filter value ""
                 if node_name.contains(&self.filter) {
                     fav_nodes.push(*fav_node_id);
                 }
             }
         }
+
+        // filter out my own node if the node number is known yet
+        fav_nodes.retain(|fav_node_id| Some(*fav_node_id) != self.my_node_num);
 
         // If there are favourite nodes, show the header and list them
         if !fav_nodes.is_empty() {
@@ -816,39 +820,43 @@ impl DeviceView {
         add_buttons: bool,
         select: fn(ChannelId) -> Message,
     ) -> Column<'a, Message> {
-        let node_list = self
+        // Initial list of nodes that are NOT already in the list of favourite nodes and does
+        // not include my own node (if the node number is known)
+        let other_nodes_list = self
             .nodes
             .keys()
             .filter(|node_id| {
                 !config.fav_nodes.contains(node_id) && Some(**node_id) != self.my_node_num
             })
-            .collect::<Vec<_>>();
-        if !node_list.is_empty() {
-            channels_list =
-                channels_list.push(self.section_header(format!("Nodes ({})", node_list.len())));
-
-            for node_id in node_list {
-                if let Some(node_name) = self.aliased_long_name(config, *node_id) {
-                    if !node_name.contains(&self.filter) {
-                        continue;
-                    }
-
-                    let channel_id = Node(*node_id);
-
-                    channels_list = channels_list.push(
-                        self.node_row(
-                            self.channel_views
-                                .get(&channel_id)
-                                .unwrap()
-                                .num_unseen_messages(),
-                            *node_id,
-                            false, // Not a Favourite
-                            config,
-                            add_buttons,
-                            select,
-                        ),
-                    );
+            .filter(|node_id| {
+                if let Some(node_name) = self.aliased_long_name(config, **node_id) {
+                    node_name.contains(&self.filter)
+                } else {
+                    false
                 }
+            })
+            .collect::<Vec<_>>();
+
+        if !other_nodes_list.is_empty() {
+            channels_list = channels_list
+                .push(self.section_header(format!("Nodes ({})", other_nodes_list.len())));
+
+            for node_id in other_nodes_list {
+                let channel_id = Node(*node_id);
+
+                channels_list = channels_list.push(
+                    self.node_row(
+                        self.channel_views
+                            .get(&channel_id)
+                            .unwrap()
+                            .num_unseen_messages(),
+                        *node_id,
+                        false, // Not a Favourite
+                        config,
+                        add_buttons,
+                        select,
+                    ),
+                );
             }
         }
 
