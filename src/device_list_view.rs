@@ -183,7 +183,7 @@ impl DeviceListView {
                         .style(text_input_style)
                         .into()
                 } else {
-                    text(device_name).shaping(Advanced).into()
+                    text(device_name).width(250).shaping(Advanced).into()
                 };
 
             device_row = device_row.push(name_element);
@@ -270,6 +270,8 @@ impl DeviceListView {
         menu_bar!((menu_root_button("▼"), {
             menu_tpl_1(menu_items).width(180)
         }))
+        .close_on_background_click(true)
+        .close_on_item_click(true)
         .style(menu_button_style)
     }
 }

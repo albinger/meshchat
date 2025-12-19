@@ -439,6 +439,8 @@ impl ChannelViewEntry {
         menu_bar!((menu_root_button("▼"), {
             menu_tpl_1(menu_items).width(140)
         }))
+        .close_on_background_click(true)
+        .close_on_item_click(true)
         .style(menu_button_style)
     }
 }

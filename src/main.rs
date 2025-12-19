@@ -16,9 +16,10 @@ use crate::device_view::{DeviceView, DeviceViewMessage};
 use crate::linear::Linear;
 use crate::notification::{Notification, Notifications};
 use btleplug::api::BDAddr;
-use iced::widget::{Column, Space};
-use iced::{Element, Fill};
-use iced::{Event, Subscription, Task, clipboard, window};
+use iced::keyboard::key;
+use iced::widget::{Column, Space, operation};
+use iced::{Element, Fill, event};
+use iced::{Event, Subscription, Task, clipboard, keyboard, window};
 use std::cmp::PartialEq;
 use std::time::Duration;
 
@@ -79,6 +80,7 @@ pub enum Message {
     RemoveNodeAlias(u32),
     AddDeviceAlias(BDAddr, String),
     RemoveDeviceAlias(BDAddr),
+    Event(Event),
     None,
 }
 
@@ -198,6 +200,29 @@ impl MeshChat {
                 self.config.device_aliases.remove(&mac_address);
                 save_config(&self.config)
             }
+            Message::Event(event) => match event {
+                Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(key::Named::Tab),
+                    modifiers,
+                    ..
+                }) => {
+                    if modifiers.shift() {
+                        operation::focus_previous()
+                    } else {
+                        operation::focus_next()
+                    }
+                }
+                Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(key::Named::Escape),
+                    ..
+                }) => {
+                    // Exit any interactive modes underway
+                    self.device_view.cancel_interactive();
+                    self.device_list_view.stop_editing_alias();
+                    Task::none()
+                }
+                _ => Task::none(),
+            },
         }
     }
 
@@ -249,6 +274,7 @@ impl MeshChat {
             Subscription::run(ble_discovery).map(DeviceListViewEvent),
             Subscription::run(device_subscription::subscribe)
                 .map(|m| DeviceViewEvent(SubscriptionMessage(m))),
+            event::listen().map(Message::Event),
         ];
 
         Subscription::batch(subscriptions)

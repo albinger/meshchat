@@ -184,7 +184,7 @@ impl ChannelView {
                 Task::none()
             }
             CancelPrepareReply => {
-                self.preparing_reply = None;
+                self.cancel_interactive();
                 Task::none()
             }
             MessageSeen(_, message_id) => {
@@ -197,6 +197,11 @@ impl ChannelView {
                 Task::perform(empty(), move |_| DeviceViewEvent(ShowChannel(channel_id)))
             }
         }
+    }
+
+    /// Cancel any interactive modes underway
+    pub fn cancel_interactive(&mut self) {
+        self.preparing_reply = None;
     }
 
     /// Construct an Element that displays the channel view
