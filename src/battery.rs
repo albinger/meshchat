@@ -166,7 +166,7 @@ where
 
         // Battery terminal (right side protrusion)
         let battery_terminal = Rectangle {
-            x: bounds.x + bounds.width - terminal_width,
+            x: bounds.x + battery_body.width - (border_width / 2.0),
             y: bounds.y + terminal_offset,
             width: terminal_width,
             height: terminal_height,
@@ -251,8 +251,8 @@ where
                 let percentage = percentage.min(100);
 
                 // Calculate charge fill width
-                let padding = border_width + 2.0;
-                let fill_width = (battery_body.width - padding * 2.0) * (percentage as f32 / 100.0);
+                let fill_width =
+                    (battery_body.width - border_width * 2.0) * (percentage as f32 / 100.0);
 
                 if fill_width > 0.0 {
                     // Determine charge color based on percentage
@@ -266,17 +266,17 @@ where
 
                     // Draw charge fill
                     let charge_fill = Rectangle {
-                        x: bounds.x + padding,
-                        y: bounds.y + padding,
+                        x: bounds.x + border_width,
+                        y: bounds.y + border_width,
                         width: fill_width,
-                        height: bounds.height - padding * 2.0,
+                        height: bounds.height - border_width * 2.0,
                     };
 
                     renderer.fill_quad(
                         renderer::Quad {
                             bounds: charge_fill,
                             border: Border {
-                                radius: Radius::from(1.0),
+                                radius: Radius::from(0.0),
                                 width: 0.0,
                                 color: Color::TRANSPARENT,
                             },
