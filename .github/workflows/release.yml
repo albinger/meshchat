@@ -1,0 +1,72 @@
+name: Release Bundle
+
+on:
+  release:
+    types: [published]
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: 1
+  GH_TOKEN: ${{ github.token }}
+
+
+jobs:
+  build-and-bundle:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-15 ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies - Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt install libdbus-1-dev pkg-config
+
+      - name: Install cargo bundle
+        run: cargo install cargo-bundle
+
+      - name: Build bundle
+        run: cargo bundle --release
+
+      - name: Find and prepare bundle artifacts
+        id: find-bundles
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            BUNDLE_PATH=$(find target/release/bundle -name "*.AppImage" -o -name "*.deb" | head -1)
+            BUNDLE_NAME=$(basename "$BUNDLE_PATH")
+          elif [ "${{ runner.os }}" == "macOS" ]; then
+            BUNDLE_PATH=$(find target/release/bundle -name "*.app" -type d | head -1)
+            BUNDLE_NAME=$(basename "$BUNDLE_PATH")
+            BUNDLE_DIR=$(dirname "$BUNDLE_PATH")
+            # Create a zip for macOS app bundle
+            cd "$BUNDLE_DIR"
+            zip -r "${BUNDLE_NAME}.zip" "$BUNDLE_NAME"
+            BUNDLE_PATH="${BUNDLE_DIR}/${BUNDLE_NAME}.zip"
+            BUNDLE_NAME="${BUNDLE_NAME}.zip"
+          elif [ "${{ runner.os }}" == "Windows" ]; then
+            BUNDLE_PATH=$(find target/release/bundle -name "*.msi" | head -1)
+            BUNDLE_NAME=$(basename "$BUNDLE_PATH")
+          fi
+          echo "bundle_path=$BUNDLE_PATH" >> $GITHUB_OUTPUT
+          echo "bundle_name=$BUNDLE_NAME" >> $GITHUB_OUTPUT
+          echo "Found bundle: $BUNDLE_PATH"
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ steps.find-bundles.outputs.bundle_path }}
+          tag_name: ${{ github.event.release.tag_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
