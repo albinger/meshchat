@@ -3,7 +3,7 @@ use crate::Message::RemoveNotification;
 use crate::styles::{button_chip_style, error_notification_style, info_notification_style};
 use iced::widget::container::Style;
 use iced::widget::{Column, Container, Row, button, text};
-use iced::{Element, Fill, Right, Theme};
+use iced::{Element, Fill, Right, Task, Theme};
 
 /// A [Notification] can be one of two notification types:
 /// - Error(summary, detail)
@@ -63,14 +63,16 @@ impl Notifications {
     /// Add a notification to the list of notifications to display at the top of the screen.
     /// Notifications are displayed in a list, with the most recent at the top.
     /// Each notification has a unique id, which is used to remove it from the list.
-    pub fn add(&mut self, notification: Notification) {
+    pub fn add(&mut self, notification: Notification) -> Task<Message> {
         self.inner.push((self.next_id, notification));
         self.next_id += 1;
+        Task::none()
     }
 
     /// Remove a notification from the list of notifications displayed at the top of the screen.
     /// Use the unique id to identify it
-    pub fn remove(&mut self, id: usize) {
+    pub fn remove(&mut self, id: usize) -> Task<Message> {
         self.inner.retain(|item| item.0 != id);
+        Task::none()
     }
 }

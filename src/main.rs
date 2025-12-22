@@ -11,8 +11,9 @@ use crate::channel_view::ChannelId;
 use crate::config::{Config, load_config, save_config};
 use crate::device_list_view::{DeviceListEvent, DeviceListView, ble_discovery};
 use crate::device_view::ConnectionState::{Connected, Connecting, Disconnecting};
+use crate::device_view::DeviceView;
+use crate::device_view::DeviceViewMessage;
 use crate::device_view::DeviceViewMessage::{DisconnectRequest, SubscriptionMessage};
-use crate::device_view::{DeviceView, DeviceViewMessage};
 use crate::linear::Linear;
 use crate::notification::{Notification, Notifications};
 use btleplug::api::BDAddr;
@@ -38,6 +39,8 @@ mod styles;
 /// Icons generated as a font using iced_fontello
 mod icons;
 mod notification;
+#[cfg(test)]
+mod test_helper;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum View {
@@ -95,6 +98,7 @@ fn main() -> iced::Result {
 }
 
 impl MeshChat {
+    /// Create a new instance of the app and load the config asynchronously
     fn new() -> (Self, Task<Message>) {
         (Self::default(), Task::batch(vec![load_config()]))
     }
@@ -104,7 +108,7 @@ impl MeshChat {
     fn title(&self) -> String {
         let unread_count = self.device_view.unread_count();
         if unread_count > 0 {
-            format!("MeshChat ({} unread) ", unread_count)
+            format!("MeshChat ({} unread)", unread_count)
         } else {
             "MeshChat".to_string()
         }
@@ -127,12 +131,10 @@ impl MeshChat {
             DeviceViewEvent(device_event) => self.device_view.update(device_event),
             Exit => window::latest().and_then(window::close),
             AppNotification(summary, detail) => {
-                self.notifications.add(Notification::Info(summary, detail));
-                Task::none()
+                self.notifications.add(Notification::Info(summary, detail))
             }
             AppError(summary, detail) => {
-                self.notifications.add(Notification::Error(summary, detail));
-                Task::none()
+                self.notifications.add(Notification::Error(summary, detail))
             }
             Message::None => Task::none(),
             NewConfig(config) => {
@@ -157,10 +159,7 @@ impl MeshChat {
                 // and save it asynchronously, so that we don't block the GUI thread
                 save_config(&self.config)
             }
-            RemoveNotification(id) => {
-                self.notifications.remove(id);
-                Task::none()
-            }
+            RemoveNotification(id) => self.notifications.remove(id),
             ShowLocation(lat, long) => {
                 let _ = webbrowser::open(&Self::location_url(lat, long));
                 Task::none()
@@ -262,15 +261,18 @@ impl MeshChat {
 
     /// Convert a location tuple to a URL that can be opened in a browser.
     fn location_url(lat: i32, long: i32) -> String {
-        let latitude = 0.0000001 * lat as f64;
-        let longitude = 0.0000001 * long as f64;
-        format!("https://maps.google.com/?q={},{}", latitude, longitude)
+        let latitude = 0.0000001 * (lat as f64);
+        let longitude = 0.0000001 * (long as f64);
+        format!(
+            "https://maps.google.com/?q={:.7},{:.7}",
+            latitude, longitude
+        )
     }
 
     /// Subscribe to events from Discover and from Windows and from Devices (Radios)
     fn subscription(&self) -> Subscription<Message> {
         let subscriptions = vec![
-            iced::event::listen().map(WindowEvent),
+            event::listen().map(WindowEvent),
             Subscription::run(ble_discovery).map(DeviceListViewEvent),
             Subscription::run(device_subscription::subscribe)
                 .map(|m| DeviceViewEvent(SubscriptionMessage(m))),
@@ -303,5 +305,49 @@ impl MeshChat {
         } else {
             Task::none()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::channel_view_entry::Payload;
+
+    #[test]
+    fn test_location_url() {
+        assert_eq!(
+            MeshChat::location_url(50, 1),
+            "https://maps.google.com/?q=0.0000050,0.0000001"
+        );
+    }
+
+    #[test]
+    fn title_no_unread() {
+        let meshchat = MeshChat::default();
+        assert_eq!(meshchat.title(), "MeshChat".to_string());
+    }
+
+    #[test]
+    fn title_1_unread() {
+        let mut test_app = test_helper::test_app();
+
+        // add an unread message
+        test_app.new_message(Payload::NewTextMessage("Hello World".into()));
+
+        // Setup mocks
+        assert_eq!(test_app.title(), "MeshChat (1 unread)".to_string());
+    }
+
+    #[test]
+    fn test_default_view() {
+        let meshchat = test_helper::test_app();
+        assert_eq!(meshchat.current_view, DeviceList);
+    }
+
+    #[test]
+    fn navigate_to_device_view() {
+        let mut meshchat = test_helper::test_app();
+        let _ = meshchat.update(Navigation(View::Device(None)));
+        assert_eq!(meshchat.current_view, View::Device(None));
     }
 }
