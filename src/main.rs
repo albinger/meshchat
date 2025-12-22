@@ -39,6 +39,8 @@ mod styles;
 /// Icons generated as a font using iced_fontello
 mod icons;
 mod notification;
+#[cfg(test)]
+mod test_helper;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum View {
@@ -96,6 +98,7 @@ fn main() -> iced::Result {
 }
 
 impl MeshChat {
+    /// Create a new instance of the app and load the config asynchronously
     fn new() -> (Self, Task<Message>) {
         (Self::default(), Task::batch(vec![load_config()]))
     }
@@ -128,12 +131,10 @@ impl MeshChat {
             DeviceViewEvent(device_event) => self.device_view.update(device_event),
             Exit => window::latest().and_then(window::close),
             AppNotification(summary, detail) => {
-                self.notifications.add(Notification::Info(summary, detail));
-                Task::none()
+                self.notifications.add(Notification::Info(summary, detail))
             }
             AppError(summary, detail) => {
-                self.notifications.add(Notification::Error(summary, detail));
-                Task::none()
+                self.notifications.add(Notification::Error(summary, detail))
             }
             Message::None => Task::none(),
             NewConfig(config) => {
@@ -158,10 +159,7 @@ impl MeshChat {
                 // and save it asynchronously, so that we don't block the GUI thread
                 save_config(&self.config)
             }
-            RemoveNotification(id) => {
-                self.notifications.remove(id);
-                Task::none()
-            }
+            RemoveNotification(id) => self.notifications.remove(id),
             ShowLocation(lat, long) => {
                 let _ = webbrowser::open(&Self::location_url(lat, long));
                 Task::none()
@@ -314,11 +312,6 @@ impl MeshChat {
 mod tests {
     use super::*;
     use crate::channel_view_entry::Payload;
-    use crate::device_subscription::SubscriptionEvent::DevicePacket;
-    use crate::device_view::DeviceView;
-    use meshtastic::protobufs::channel::Role;
-    use meshtastic::protobufs::from_radio::PayloadVariant;
-    use meshtastic::protobufs::{Channel, ChannelSettings, FromRadio, MyNodeInfo};
 
     #[test]
     fn test_location_url() {
@@ -335,48 +328,26 @@ mod tests {
     }
 
     #[test]
-    fn title_10_unread() {
-        let mut meshchat = MeshChat::default();
-        let mut mock_device_view = DeviceView::default();
-        let mut radio_packet = FromRadio::default();
-        radio_packet.payload_variant = Some(PayloadVariant::MyInfo(MyNodeInfo {
-            my_node_num: 999,
-            reboot_count: 0,
-            min_app_version: 0,
-            device_id: vec![],
-            pio_env: "".to_string(),
-            firmware_edition: 0,
-            nodedb_count: 0,
-        }));
-
-        let _ = mock_device_view.update(SubscriptionMessage(DevicePacket(Box::new(radio_packet))));
-
-        let mut channel = Channel::default();
-        channel.settings = Some(ChannelSettings {
-            #[allow(deprecated)]
-            channel_num: 0,
-            psk: vec![],
-            name: "Test".to_string(),
-            id: 0,
-            uplink_enabled: false,
-            downlink_enabled: false,
-            module_settings: None,
-        });
-        channel.set_role(Role::Primary);
-
-        mock_device_view.add_channel(channel);
-        let channel_view = mock_device_view
-            .channel_views
-            .get_mut(&ChannelId::Channel(0))
-            .unwrap();
+    fn title_1_unread() {
+        let mut test_app = test_helper::test_app();
 
         // add an unread message
-        let msg = Payload::NewTextMessage("Hello World".into());
-        let channel_view_entry = channel_view_entry::ChannelViewEntry::new(msg, 0, 1);
-        channel_view.new_message(channel_view_entry);
+        test_app.new_message(Payload::NewTextMessage("Hello World".into()));
 
         // Setup mocks
-        meshchat.device_view = mock_device_view;
-        assert_eq!(meshchat.title(), "MeshChat (1 unread)".to_string());
+        assert_eq!(test_app.title(), "MeshChat (1 unread)".to_string());
+    }
+
+    #[test]
+    fn test_default_view() {
+        let meshchat = test_helper::test_app();
+        assert_eq!(meshchat.current_view, DeviceList);
+    }
+
+    #[test]
+    fn navigate_to_device_view() {
+        let mut meshchat = test_helper::test_app();
+        let _ = meshchat.update(Navigation(View::Device(None)));
+        assert_eq!(meshchat.current_view, View::Device(None));
     }
 }
