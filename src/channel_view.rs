@@ -2,7 +2,7 @@ use crate::Message::DeviceViewEvent;
 use crate::channel_view::ChannelId::{Channel, Node};
 use crate::channel_view::ChannelViewMessage::{
     CancelPrepareReply, ClearMessage, MessageInput, MessageSeen, PickChannel, PrepareReply,
-    SendMessage,
+    ReplyWithEmoji, SendMessage,
 };
 use crate::channel_view_entry::Payload::{
     AlertMessage, EmojiReply, NewTextMessage, PositionMessage, TextMessageReply, UserMessage,
@@ -48,6 +48,8 @@ pub enum ChannelViewMessage {
     CancelPrepareReply,
     MessageSeen(ChannelId, u32),
     PickChannel(Option<ChannelId>),
+    /// EmojiReply(reply_to_id, emoji_code string)
+    ReplyWithEmoji(u32, String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
@@ -194,6 +196,13 @@ impl ChannelView {
             }
             PickChannel(channel_id) => {
                 Task::perform(empty(), move |_| DeviceViewEvent(ShowChannel(channel_id)))
+            }
+            ReplyWithEmoji(message_id, emoji) => {
+                // TODO actually send the emoji reply
+                if let Some(channel_view_entry) = self.entries.get_mut(&message_id) {
+                    channel_view_entry.add_emoji(emoji, self.my_node_num);
+                }
+                Task::none()
             }
         }
     }
@@ -465,7 +474,7 @@ impl ChannelView {
         Row::new()
             .align_y(Center)
             .push(
-                text_input("Send Message", &self.message)
+                text_input("Type your message here", &self.message)
                     .style(text_input_style)
                     .on_input(|s| DeviceViewEvent(ChannelMsg(MessageInput(s))))
                     .on_submit(DeviceViewEvent(ChannelMsg(SendMessage(

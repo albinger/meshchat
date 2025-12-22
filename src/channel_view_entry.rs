@@ -1,12 +1,13 @@
 use crate::Message;
 use crate::Message::{CopyToClipBoard, DeviceViewEvent, ShowLocation};
-use crate::channel_view::ChannelViewMessage::MessageSeen;
+use crate::channel_view::ChannelViewMessage::{MessageSeen, ReplyWithEmoji};
 use crate::channel_view::{ChannelId, ChannelViewMessage};
 use crate::channel_view_entry::Payload::{
     AlertMessage, EmojiReply, NewTextMessage, PositionMessage, TextMessageReply, UserMessage,
 };
 use crate::device_view::DeviceViewMessage::{ChannelMsg, ShowChannel, StartForwardingMessage};
 use crate::device_view::short_name;
+use crate::emoji_picker::EmojiPicker;
 use crate::styles::{
     COLOR_DICTIONARY, COLOR_GREEN, MY_MESSAGE_BUBBLE_STYLE, OTHERS_MESSAGE_BUBBLE_STYLE,
     TIME_TEXT_COLOR, TIME_TEXT_SIZE, TIME_TEXT_WIDTH, alert_message_style, button_chip_style,
@@ -257,7 +258,7 @@ impl ChannelViewEntry {
                 .style(button_chip_style)
                 .on_press(ShowLocation(*lat, *long))
                 .into(),
-            EmojiReply(_, _) => text(message_text).into(),
+            EmojiReply(_, _) => text(message_text).into(), // TODO
         };
 
         // Create the row with message text and time and maybe an ACK tick mark
@@ -400,16 +401,22 @@ impl ChannelViewEntry {
     // TODO differentiate if we are in a node or channel view
     // if a node view, don't show the DM menu item
     fn menu_bar<'a>(
-        &self,
+        &'a self,
         name: &'a str,
         message: String,
     ) -> MenuBar<'a, Message, Theme, Renderer> {
         let menu_tpl_1 = |items| Menu::new(items).spacing(3);
 
+        let menu_tpl_2 = |items| Menu::new(items).max_width(180.0).offset(15.0).spacing(5.0);
+
+        let message_id = self.message_id;
         let dm = format!("DM with {}", name);
-        //(menu_button("react".into(), Message::None))
         #[rustfmt::skip]
         let menu_items = menu_items!(
+            (button("react ▶").style(button_chip_style).padding([4, 8])
+        .width(Fill),
+            menu_tpl_2(menu_items!(
+                (EmojiPicker::new().width(200).height(200).on_emoji_selected( move |emoji| DeviceViewEvent(ChannelMsg(ReplyWithEmoji(message_id, String::from(emoji))))))))),
             (menu_button("copy".into(), CopyToClipBoard(message.to_string()))),
             (menu_button("forward".into(), DeviceViewEvent(StartForwardingMessage(self.clone())))),
             (menu_button("reply".into(), DeviceViewEvent(ChannelMsg(ChannelViewMessage::PrepareReply(self.message_id))))),

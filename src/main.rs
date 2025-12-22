@@ -38,6 +38,7 @@ mod styles;
 #[rustfmt::skip]
 /// Icons generated as a font using iced_fontello
 mod icons;
+mod emoji_picker;
 mod notification;
 #[cfg(test)]
 mod test_helper;
