@@ -413,7 +413,7 @@ impl ChannelViewEntry {
         let menu_items = menu_items!(
             (button("react ▶").style(button_chip_style).padding([4, 8]).width(Fill),
             menu_tpl_2(menu_items!(
-            (EmojiPicker::new().on_select(|emoji| DeviceViewEvent(ReplyWithEmoji(self.message_id, emoji))))))),
+            (EmojiPicker::new().view(move |emoji| DeviceViewEvent(ChannelMsg(ReplyWithEmoji(message_id, emoji)))))))),
             (menu_button("copy".into(), CopyToClipBoard(message.to_string()))),
             (menu_button("forward".into(), DeviceViewEvent(StartForwardingMessage(self.clone())))),
             (menu_button("reply".into(), DeviceViewEvent(ChannelMsg(ChannelViewMessage::PrepareReply(self.message_id))))),
