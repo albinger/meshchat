@@ -426,7 +426,7 @@ impl ChannelViewEntry {
 
         #[rustfmt::skip]
         let menu_items = menu_items!(
-            (button("react ▶").style(button_chip_style).padding([4, 8]).width(Fill),
+            (button("react ▶").style(button_chip_style).width(Fill),
             menu_tpl_2(menu_items!(
             (picker_element)))),
             (menu_button("copy".into(), CopyToClipBoard(message.to_string()))),

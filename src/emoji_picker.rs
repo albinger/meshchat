@@ -1,4 +1,4 @@
-use crate::styles::button_chip_style;
+use crate::styles::{button_chip_style, scrollbar_style};
 use emojis::Group;
 use iced::{
     Element, Length, Theme,
@@ -110,6 +110,7 @@ impl EmojiPicker {
             items.push(Element::from(
                 tooltip(
                     button(text(emoji.as_str()).center().shaping(Advanced).size(30))
+                        .style(button_chip_style)
                         .on_press(PickerMessage::EmojiSelected(on_select(emoji.to_string()))),
                     text(emoji.name()),
                     tooltip::Position::default(),
@@ -123,10 +124,16 @@ impl EmojiPicker {
 
         let grid = grid(items).fluid(50).spacing(SPACING);
 
-        container(row![groups, scrollable(grid).spacing(SPACING)].spacing(10))
-            .width(self.width)
-            .height(self.height)
-            .into()
+        container(
+            row![
+                groups,
+                scrollable(grid).style(scrollbar_style).spacing(SPACING)
+            ]
+            .spacing(10),
+        )
+        .width(self.width)
+        .height(self.height)
+        .into()
     }
 }
 
