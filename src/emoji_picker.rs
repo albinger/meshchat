@@ -1,3 +1,4 @@
+use crate::styles::button_chip_style;
 use emojis::Group;
 use iced::{
     Element, Length, Theme,
@@ -49,7 +50,7 @@ impl EmojiPicker {
     }
 
     /// Update the picker state based on messages
-    /// Returns Some(Message) when an emoji is selected, None for group changes
+    /// Returns `Some(Message)` when an emoji is selected, None for group changes
     pub fn update<Message>(&mut self, message: PickerMessage<Message>) -> Option<Message> {
         match message {
             PickerMessage::GroupSelected(group) => {
@@ -62,26 +63,43 @@ impl EmojiPicker {
 
     /// Create the view for the emoji picker with group selection buttons
     /// The on_select closure is called with the selected emoji string and should return your Message type
-    pub fn view<'a, Message: 'a>(
+    pub fn view<'a, Message>(
         &self,
         on_select: impl Fn(String) -> Message + 'a,
     ) -> Element<'a, PickerMessage<Message>>
     where
-        Message: Clone,
+        Message: 'a + Clone,
     {
         const SPACING: u32 = 3;
 
         let groups = column![
-            button(text("😀")).on_press(PickerMessage::GroupSelected(Group::SmileysAndEmotion)),
-            button(text("👋")).on_press(PickerMessage::GroupSelected(Group::PeopleAndBody)),
-            button(text("🐒")).on_press(PickerMessage::GroupSelected(Group::AnimalsAndNature)),
-            button(text("🍉")).on_press(PickerMessage::GroupSelected(Group::FoodAndDrink)),
-            button(text("🗺️").shaping(Advanced))
-                .on_press(PickerMessage::GroupSelected(Group::TravelAndPlaces)),
-            button(text("🎉")).on_press(PickerMessage::GroupSelected(Group::Activities)),
-            button(text("📣")).on_press(PickerMessage::GroupSelected(Group::Objects)),
-            button(text("🚮")).on_press(PickerMessage::GroupSelected(Group::Symbols)),
-            button(text("🏁")).on_press(PickerMessage::GroupSelected(Group::Flags)),
+            button(text("😀"))
+                .on_press(PickerMessage::GroupSelected(Group::SmileysAndEmotion))
+                .style(button_chip_style),
+            button(text("👋"))
+                .on_press(PickerMessage::GroupSelected(Group::PeopleAndBody))
+                .style(button_chip_style),
+            button(text("🐒"))
+                .on_press(PickerMessage::GroupSelected(Group::AnimalsAndNature))
+                .style(button_chip_style),
+            button(text("🍉"))
+                .on_press(PickerMessage::GroupSelected(Group::FoodAndDrink))
+                .style(button_chip_style),
+            button(text("🗺️"))
+                .on_press(PickerMessage::GroupSelected(Group::TravelAndPlaces))
+                .style(button_chip_style),
+            button(text("🎉"))
+                .on_press(PickerMessage::GroupSelected(Group::Activities))
+                .style(button_chip_style),
+            button(text("📣"))
+                .on_press(PickerMessage::GroupSelected(Group::Objects))
+                .style(button_chip_style),
+            button(text("🚮"))
+                .on_press(PickerMessage::GroupSelected(Group::Symbols))
+                .style(button_chip_style),
+            button(text("🏁"))
+                .on_press(PickerMessage::GroupSelected(Group::Flags))
+                .style(button_chip_style),
         ]
         .spacing(SPACING);
 

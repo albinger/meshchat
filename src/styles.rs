@@ -250,42 +250,6 @@ pub fn count_style(_theme: &Theme) -> Style {
     }
 }
 
-pub fn transparent_button_style(_theme: &Theme, status: Status, color: Color) -> button::Style {
-    let mut style = match status {
-        Status::Active => button::Style {
-            background: None,
-            text_color: Color::WHITE,
-            border: NO_BORDER,
-            shadow: NO_SHADOW,
-            snap: false,
-        },
-        Hovered => button::Style {
-            background: None,
-            text_color: Color::WHITE,
-            border: NO_BORDER,
-            shadow: NO_SHADOW,
-            snap: false,
-        },
-        Status::Pressed => button::Style {
-            background: None,
-            text_color: Color::WHITE,
-            border: NO_BORDER,
-            shadow: NO_SHADOW,
-            snap: false,
-        },
-        Status::Disabled => button::Style {
-            background: None,
-            text_color: Color::WHITE,
-            border: NO_BORDER,
-            shadow: NO_SHADOW,
-            snap: false,
-        },
-    };
-
-    style.text_color = color;
-    style
-}
-
 pub fn fav_button_style(_theme: &Theme, status: Status) -> button::Style {
     match status {
         Status::Active => button::Style {
