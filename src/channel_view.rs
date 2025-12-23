@@ -48,8 +48,8 @@ pub enum ChannelViewMessage {
     CancelPrepareReply,
     MessageSeen(ChannelId, u32),
     PickChannel(Option<ChannelId>),
-    /// EmojiReply(reply_to_id, emoji_code string)
-    ReplyWithEmoji(u32, String),
+    //EmojiReply(u32, String),     // we are replying to a message with an emoji
+    ReplyWithEmoji(u32, String), // We received an emoji reply to a message
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]

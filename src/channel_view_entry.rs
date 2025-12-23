@@ -1,6 +1,6 @@
 use crate::Message;
 use crate::Message::{CopyToClipBoard, DeviceViewEvent, ShowLocation};
-use crate::channel_view::ChannelViewMessage::MessageSeen;
+use crate::channel_view::ChannelViewMessage::{MessageSeen, ReplyWithEmoji};
 use crate::channel_view::{ChannelId, ChannelViewMessage};
 use crate::channel_view_entry::Payload::{
     AlertMessage, EmojiReply, NewTextMessage, PositionMessage, TextMessageReply, UserMessage,
@@ -34,9 +34,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub enum Payload {
     AlertMessage(String),
     NewTextMessage(String),
-    /// TextMessageReply(reply_to_id, reply text)
     TextMessageReply(u32, String),
-    /// EmojiReply(reply_to_id, emoji_code string)
     EmojiReply(u32, String),
     PositionMessage(i32, i32),
     UserMessage(User),
@@ -413,10 +411,9 @@ impl ChannelViewEntry {
         let dm = format!("DM with {}", name);
         #[rustfmt::skip]
         let menu_items = menu_items!(
-            (button("react ▶").style(button_chip_style).padding([4, 8])
-        .width(Fill),
+            (button("react ▶").style(button_chip_style).padding([4, 8]).width(Fill),
             menu_tpl_2(menu_items!(
-                (EmojiPicker::new())))),
+            (EmojiPicker::new().on_select(|emoji| DeviceViewEvent(ReplyWithEmoji(self.message_id, emoji))))))),
             (menu_button("copy".into(), CopyToClipBoard(message.to_string()))),
             (menu_button("forward".into(), DeviceViewEvent(StartForwardingMessage(self.clone())))),
             (menu_button("reply".into(), DeviceViewEvent(ChannelMsg(ChannelViewMessage::PrepareReply(self.message_id))))),
