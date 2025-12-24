@@ -17,6 +17,7 @@ On the right, the Channel view, Once you have clicked on a channel or a node, sh
 it,
 with your messages on the right and others on the left.
 
+<!--suppress ALL -->
 <table cellspacing="0" cellpadding="0" border="0">
   <tr>
     <td valign="top">
@@ -35,6 +36,9 @@ with your messages on the right and others on the left.
 Since the app doesn't try to change the configuration of any attached radio, at most it tries to send
 messages, the risk of "damage" from any bug is kind of low.
 
+Here is the list
+of [Known Bugs](https://github.com/andrewdavidmackenzie/meshchat/issues?q=is%3Aissue%20state%3Aopen%20label%3Abug)
+
 ## The Thinking
 
 My thinking was to keep the app as simple to look at and use as possible.
@@ -47,6 +51,43 @@ My thinking was to keep the app as simple to look at and use as possible.
 I've made some unusual (and questionable) UI choices even in the minimal UI I have. They just kind of
 materialized as I went, and I don't claim it's great...If people can use it easily, great. If not, help is welcome
 to improve it.
+
+## Newer Features
+
+Here are some of the newer features I have added in recent releases:
+
+### 0.2.0 Release
+
+This is the first "real" release I've done via GitHub releases. It includes:
+
+- Discover nearby MeshTastic compatible radios via Bluetooth and list them in the Device View
+- Connect to a MeshTastic radio, then view a list of Channels and Nodes it knows about
+- Filter the list of Channels and Nodes by name
+- Start a chat with a Channel or a Node, viewing messages received and send new messages
+  (Text, Text Reply, Position, Alert, NodeInfo)
+- Unread message count indicator on Channels, Nodes and Device overall
+- macOS and Linux application bundles are included in the GH Release Artifacts (Windows is still broken)
+- Ability to Reply to a message, show replies quoting the original message
+- Ability to Forward a message to another Channel or Node
+- Ability to Copy a message to the clipboard to be pasted elsewhere
+- Ability to React to a message with an emoji
+- Ability to start a DM with a Node from its name in a message
+- Empty views for Device List and Channel/Node View when there is nothing to see, with some instructions
+- Ability to Send your radio's current position
+- Ability to Send your node's info
+- Show the battery level of the connected radio in the header
+- Ability to alias a BlueTooth Device with a more friendly or memorable name of your choosing
+- Ability to alias a Node with a more friendly or memorable name of your choosing
+- Ability to favourite Nodes and show the list of Favourite nodes at the top of the Device View
+- Button on each node in the Device View to allow you to see its position (on Google Maps)
+
+## Discussions
+
+I have enabled [GitHub discussions](https://github.com/andrewdavidmackenzie/meshchat/discussions), so if you want to
+talk about things, jump in there.
+
+In particular, I am interested in hearing users thoughts
+about [storing chat history locally](https://github.com/andrewdavidmackenzie/meshchat/discussions/145)
 
 ## Supported OS
 
@@ -66,7 +107,8 @@ of known working OS.
 
 ## CI Testing
 
-Tests are run in GitHub actions on macos-15, ubuntu-latest and window-latest.
+Tests are run in GitHub actions on macos-15, ubuntu-latest and window-latest. Coverage is still low, but now
+at least I am measuring it and working to increase it gradually.
 
 ## Supported Radios
 
@@ -120,11 +162,21 @@ marked a few with the "help needed" label, but I would basically welcome help in
 
 Help from someone with some real UI / UX chops would be great.
 
+Major areas of work remaining I would call out are:
+
+- Review / Re-Implement a lot of the styling in Iced, using Themes and respecting the OS theme settings
+- Improve the testing, probably using new (0.14.0) Iced test facilities
+- Fix Windows bundling
+
 As usual for such rust projects, much work is needed on CI, Releasing, Bundling for OS, etc. Help there would be great.
 
 If you want to help out, submit a well-written issue, or start a conversation in
-the [discussions](https://github.com/andrewdavidmackenzie/meshchat/discussions)
-or clone the repo, make some improvement and submit a PR.
+the [discussions](https://github.com/andrewdavidmackenzie/meshchat/discussions) or clone the repo, make some improvement
+and submit a PR.
+
+I keep an eye on MeshCore too, and if there was a reasonable rust crate to talk to MeshCore radios, I would
+consider working on supporting both simultaneously. That would force cleaning up MeshTastic code that has
+leaked into the MeshChat code, abstracting away the radio specifics.
 
 ## Licensing
 
