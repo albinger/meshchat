@@ -65,6 +65,7 @@ This is the first "real" release I've done via GitHub releases. It includes:
 - Filter the list of Channels and Nodes by name
 - Start a chat with a Channel or a Node, viewing messages received and send new messages
   (Text, Text Reply, Position, Alert, NodeInfo)
+- Acknowledgement indicator on message to show it was received by the other side
 - Unread message count indicator on Channels, Nodes and Device overall
 - macOS and Linux application bundles are included in the GH Release Artifacts (Windows is still broken)
 - Ability to Reply to a message, show replies quoting the original message
