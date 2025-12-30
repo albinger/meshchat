@@ -62,10 +62,12 @@ This is the first "real" release I've done via GitHub releases. It includes:
 
 - Discover nearby MeshTastic compatible radios via Bluetooth and list them in the Device View
 - Connect to a MeshTastic radio, then view a list of Channels and Nodes it knows about
+- Save the last device connected to (and channel if applicable), and on re-start automatically reconnect to it and
+  open the channel
 - Filter the list of Channels and Nodes by name
 - Start a chat with a Channel or a Node, viewing messages received and send new messages
   (Text, Text Reply, Position, Alert, NodeInfo)
-- Acknowledgement indicator on message to show it was received by the other side
+- Acknowledgement indicator on a message to show it was received by the other side
 - Unread message count indicator on Channels, Nodes and Device overall
 - macOS and Linux application bundles are included in the GH Release Artifacts (Windows is still broken)
 - Ability to Reply to a message, show replies quoting the original message
