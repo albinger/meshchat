@@ -65,8 +65,7 @@ jobs:
             BUNDLE_PATH="${BUNDLE_DIR}/${BUNDLE_NAME}.zip"
             BUNDLE_NAME="${BUNDLE_NAME}.zip"
           elif [ "${{ runner.os }}" == "Windows" ]; then
-            echo "PWD = $PWD"
-            echo "Contents = " `ls`
+            find wix -name "*.msi"
             BUNDLE_PATH=$(find wix -name "*.msi" | head -1)
             BUNDLE_NAME=$(basename "$BUNDLE_PATH")
           fi
