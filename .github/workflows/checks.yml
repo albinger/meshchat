@@ -24,32 +24,6 @@ jobs:
       - name: Run cargo fmt check
         run: cargo fmt --all -- --check
 
-  test-windows-bundling: #TODO remove before merge and edit release.yml to match
-    runs-on: windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: install cargo wix
-        run: cargo install cargo-wix
-
-      - name: cargo wix
-        run: cargo wix --verbose
-
-      - name: tree target
-        run: TREE D:\a\meshchat\meshchat\target /F
-
-      - name: Install cargo bundle
-        run: cargo install cargo-bundle
-
-      - name: Build bundle
-        run: cargo bundle --release
-
   clippy:
     runs-on: ubuntu-latest
     steps:
