@@ -65,8 +65,8 @@ jobs:
             BUNDLE_PATH="${BUNDLE_DIR}/${BUNDLE_NAME}.zip"
             BUNDLE_NAME="${BUNDLE_NAME}.zip"
           elif [ "${{ runner.os }}" == "Windows" ]; then
-            find wix -name "*.msi"
-            BUNDLE_PATH=$(find wix -name "*.msi" | head -1)
+            find . -name "*.msi"
+            BUNDLE_PATH=$(find . -name "*.msi" | head -1)
             BUNDLE_NAME=$(basename "$BUNDLE_PATH")
           fi
           echo "bundle_path=$BUNDLE_PATH" >> $GITHUB_OUTPUT
