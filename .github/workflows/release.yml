@@ -40,6 +40,18 @@ jobs:
         if: runner.os != 'Windows'
         run: cargo bundle --release
 
+      - name: Add msbuild to PATH
+        if: runner.os == 'Windows'
+        uses: microsoft/setup-msbuild@v1.1
+
+      - name: Install WiX
+        if: runner.os == 'Windows'
+        run: dotnet tool install --global wix
+
+      - name: Build WiX on Windows
+        if: runner.os == 'Windows'
+        run: wix build .\nexus.wxs
+
       - name: Install cargo wix for Windows
         if: runner.os == 'Windows'
         run: cargo install cargo-wix
