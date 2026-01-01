@@ -48,10 +48,6 @@ jobs:
         if: runner.os == 'Windows'
         run: dotnet tool install --global wix
 
-      - name: Build WiX on Windows
-        if: runner.os == 'Windows'
-        run: wix build .\wix\main.wxs
-
       - name: Install cargo wix for Windows
         if: runner.os == 'Windows'
         run: cargo install cargo-wix
